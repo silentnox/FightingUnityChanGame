@@ -40,7 +40,11 @@ public class GunHelper : MonoBehaviour {
 
 	UnitHealth gunOwner = null;
 
-	RaycastHit ProbeRay(out UnitHealth hitBody) {
+	public int GetSalvoCounter() {
+		return salvoCounter;
+	}
+
+	public RaycastHit ProbeRay(out UnitHealth hitBody) {
 		Ray ray = new Ray(Muzzle.position, Muzzle.forward);
 		RaycastHit hit;
 
@@ -71,6 +75,11 @@ public class GunHelper : MonoBehaviour {
 
 		if (hit.collider) {
 			UnitHealth hitBody = hit.collider.gameObject.GetComponent<UnitHealth>();
+			HitCollider hitCollider = hit.collider.gameObject.GetComponent<HitCollider>();
+
+			if(!hitBody && hitCollider && hitCollider.ColliderType == HitCollider.Type.Receive) {
+				hitBody = hitCollider.GetOwner();
+			}
 
 			if(hitBody) {
 				hitBody.Damage(DamagePerBullet);
@@ -107,7 +116,10 @@ public class GunHelper : MonoBehaviour {
 		flashLine.startWidth = 0.02f;
 		flashLine.endWidth = 0.02f;
 		flashLine.material = new Material(Shader.Find("Standard"));
+		flashLine.material.EnableKeyword("_EMISSION");
+		flashLine.material.SetColor("_EmissionColor", Color.white);
 		flashLine.allowOcclusionWhenDynamic = false;
+		flashLine.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
 		flash.transform.SetParent(Muzzle);
 
 		salvoCounter = SalvoSize;

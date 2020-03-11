@@ -24,14 +24,6 @@ public class ThirdPersonControl : MonoBehaviour {
 	bool inputPunch = false;
 	bool inputAnimateLocomotion = true;
 
-	// last turn values cache
-	//Vector3 lastPosition = Vector3.zero;
-	//float lastRotation = 0;
-
-	//Vector3 lastVelocity = Vector3.zero;
-	//float lastSpeed = 0;
-	//float lastTurn = 0;
-
 	// cached component refs
 	Animator animator = null;
 	UnitHealth unitHealth = null;
@@ -46,9 +38,11 @@ public class ThirdPersonControl : MonoBehaviour {
 
 	// number of times attack button was pressed
 	int hitQuery = 0;
+	int hitCounter = 0;
 	int HitQueryMax = 3;
 
 	// when processing attacking animation
+	bool activePunching = false;
 	bool activeHit = false;
 	// when processing roll animation
 	bool activeRoll = false;
@@ -59,6 +53,10 @@ public class ThirdPersonControl : MonoBehaviour {
 	float distToGround = 0.0f;
 	bool isAir = false;
 
+	bool turnAndAttack = false;
+
+	float turnSpeed = 0;
+
 	public bool IsDead() {
 		return unitHealth && unitHealth.IsDead();
 	}
@@ -66,6 +64,12 @@ public class ThirdPersonControl : MonoBehaviour {
 	void OnPunchActivate(int flag) {
 		activeHit = flag > 0;
 		Debug.Log("Punch " + flag);
+
+		HitCollider[] hitColliders = GetComponentsInChildren<HitCollider>();
+
+		foreach( HitCollider collider in hitColliders) {
+			collider.enabled = activeHit;
+		}
 	}
 
 	public void OnAnimatorStateEnter(Animator animator, AnimatorStateInfo stateInfo, int layerIndex) {
@@ -73,10 +77,17 @@ public class ThirdPersonControl : MonoBehaviour {
 
 		currentState = stateInfo;
 
-		if(stateInfo.shortNameHash == Animator.StringToHash("Punching")) {
+		//if(stateInfo.shortNameHash == Animator.StringToHash("Punching")) {
+		if (stateInfo.IsTag("Punching")) {
 			Debug.Log("Animator:" + hitQuery);
-			if (hitQuery > 0) hitQuery--;
+			if (hitQuery > 0) {
+				hitQuery--;
+				hitCounter++;
+			}
+			//if (hitQuery <= 0) hitCounter = 0;
+			if (hitCounter > 2) hitCounter = 0;
 			//activeHit = true;
+			activePunching = true;
 		}
 		if(stateInfo.shortNameHash == Animator.StringToHash("Locomotion")) {
 			activeLocomotion = true;
@@ -88,9 +99,10 @@ public class ThirdPersonControl : MonoBehaviour {
 
 		currentState = null;
 
-		if (stateInfo.shortNameHash == Animator.StringToHash("Punching")) {
+		//if (stateInfo.shortNameHash == Animator.StringToHash("Punching")) {
+		if (stateInfo.IsTag("Punching")) {
 			activeHit = false;
-			//if(hitQuery > 0) hitQuery--;
+			activePunching = false;
 		}
 		if (stateInfo.shortNameHash == Animator.StringToHash("Locomotion")) {
 			activeLocomotion = false;
@@ -100,6 +112,23 @@ public class ThirdPersonControl : MonoBehaviour {
 	void OnAttackHit( HitCollider self, HitCollider other ) {
 		if (activeHit) {
 			other.GetOwner().Damage(36);
+
+			if(other.GetOwner().IsDead()) {
+				Transform chest = other.GetOwner().GetComponent<Animator>().GetBoneTransform(HumanBodyBones.Chest);
+				Vector3 force = ( chest.position-transform.position );
+				force.y = 0;
+				force = force.normalized;
+				//force.y += 1.3f;
+				force.y += 0.8f;
+				force = force.normalized;
+				//force *= 12000;
+				//chest.GetComponent<Rigidbody>().AddForce(force);
+				force *= 200;
+				chest.GetComponent<Rigidbody>().AddForce(force,ForceMode.Impulse);
+			}
+
+			//self.enabled = false;
+			OnPunchActivate(0);
 		}
 	}
 
@@ -122,52 +151,74 @@ public class ThirdPersonControl : MonoBehaviour {
 			}
 		}
 
+		distToTarget = trackingTarget?minDist:Mathf.Infinity;
+
 		return trackingTarget != null;
 	}
 
-	void UpdateInput(/* out Vector2 dirOne,  out bool move, out bool punching */) {
+	void UpdateInput() {
 
 		Vector2 dir = new Vector2(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical"));
 		inputDir = (dir.magnitude > 1) ? dir.normalized : dir;
 
-		inputMove = true;
+		inputMove = false;
 		inputPunch = false;
 
+		inputMove = inputDir.magnitude > 0.01;
+
+		turnSpeed = (inputDir.magnitude > 0.7 ? TurnSpeed : StaticTurnSpeed);
+
 		// crouching
-		if (Input.GetKeyDown(KeyCode.LeftShift)) {
+		if (Input.GetKey(KeyCode.LeftShift)) {
 			inputDir.x *= 0.5f;
 			inputDir.y *= 0.5f;
+			//inputDir *= 0.5;
 		}
-		FindClosestTarget();
+
+		bool punching = false;
+		if (Input.GetKeyDown(KeyCode.Z)) {
+			punching = true;
+		}
+
+		bool turning = false;
+
+		// punching
+		if (punching) {
+			if (hitQuery < HitQueryMax) hitQuery++;
+		}
 
 		// turn to closest enemy if not moving
-		if(trackingTarget != null) {
+		if (trackingTarget != null) {
 			Vector2 dirToTarget = GetDirToPoint(trackingTarget.position);
+			float angle = GetSignedAngleTo(dirToTarget);
+			float absAngle = Mathf.Abs(angle);
 
-			if(Mathf.Abs( GetSignedAngleTo(dirToTarget )) < 180 ) {
-				if(inputDir.magnitude < 0.1) {
-					inputMove = false;
-					inputDir = dirToTarget;
-				}
+			if(punching && absAngle > 3 && distToTarget < 3) {
+				turnAndAttack = true;
+			}
+
+			if (absAngle < 3 || distToTarget > 3) turnAndAttack = false;
+
+			if ((absAngle < 180 && !inputMove) || turnAndAttack ) {
+				inputMove = false;
+				inputDir = dirToTarget;
+				turning = true;
 			}
 		}
 
-		// punching
-		if (Input.GetKeyDown(KeyCode.Z)) {
-			if (hitQuery < HitQueryMax) hitQuery++;
-			//inputPunch = true;
-			//inputMove = false;
-		}
-		if(hitQuery > 0) {
+		if (turnAndAttack) turnSpeed *= 2;
+
+		if(hitQuery > 0 && !turnAndAttack) {
 			inputPunch = true;
 			inputMove = false;
 			inputDir = Vector2.zero;
 		}
-		if(activeHit) {
+		if(activePunching) {
 			inputMove = false;
 			inputDir = Vector2.zero;
+			inputPunch = false;
 		}
-		Debug.Log(hitQuery);
+		//Debug.Log(hitQuery);
 	}
 
 	// Start is called before the first frame update
@@ -176,9 +227,6 @@ public class ThirdPersonControl : MonoBehaviour {
 		unitHealth = GetComponent<UnitHealth>();
 
 		anSmoothDir.current = 0;
-
-		//lastPosition = transform.position;
-		//lastRotation = GetTurn();
 
 		if(unitHealth) {
 			unitHealth.OnInflictHit += OnAttackHit;
@@ -278,7 +326,11 @@ public class ThirdPersonControl : MonoBehaviour {
 		animator.SetFloat("Direction", inputAnimateLocomotion?anSmoothDir.current:0);
 		animator.SetBool("Moving", inputAnimateLocomotion?isMoving:false);
 		animator.SetBool("Turning", false);
-		animator.SetBool("Punching", inputPunch);
+		//animator.SetBool("Punching", inputPunch);
+		//if(inputPunch) animator.SetTrigger("Punching");
+		if(inputPunch && hitCounter == 0) animator.SetTrigger("Punching");
+		if(inputPunch && hitCounter == 1) animator.SetTrigger("Punching1");
+		if(inputPunch && hitCounter == 2) animator.SetTrigger("Punching2");
 	}
 	
 	void UpdateLastPosition() {
@@ -286,34 +338,39 @@ public class ThirdPersonControl : MonoBehaviour {
 	}
 
 	void ApplyMotion( float deltaTime ) {
-		if (inputDir == Vector2.zero) return;
 
-		Vector2 dirNorm = inputDir.normalized;
-		float speedFactor = inputDir.magnitude;
-		float angleDiff = GetSignedAngleTo(dirNorm);
+		float dashFactor = animator.GetFloat("DashFactor");
+		transform.Translate(new Vector3(0, 0, dashFactor * 0.1f), Space.Self);
 
-		bool isMoving = speedFactor > 0.05 && inputMove;
+		if (inputDir != Vector2.zero) {
+			Vector2 dirNorm = inputDir.normalized;
+			float speedFactor = inputDir.magnitude;
+			float angleDiff = GetSignedAngleTo(dirNorm);
 
-		float turnAmount = (isMoving ? TurnSpeed : StaticTurnSpeed) * Mathf.Sign(angleDiff) * deltaTime;
+			bool isMoving = speedFactor > 0.05 && inputMove;
 
-		if (Mathf.Abs(turnAmount) > Mathf.Abs(angleDiff)) {
-			turnAmount = angleDiff;
-		}
+			//float turnAmount = (isMoving ? TurnSpeed : StaticTurnSpeed) * Mathf.Sign(angleDiff) * deltaTime;
+			float turnAmount = turnSpeed * Mathf.Sign(angleDiff) * deltaTime;
 
-		bool isTurning = Mathf.Abs(turnAmount) > 0.1;
-
-		float speed = MoveSpeed * speedFactor;
-
-		Vector3 velocity = transform.TransformDirection(new Vector3(0, 0, speed));
-		Vector3 moveAmount = velocity * deltaTime;
-
-		Debug.Log(velocity);
-
-		if (speedFactor > 0.01) {
-			if (inputMove) {
-				transform.localPosition += moveAmount;
+			if (Mathf.Abs(turnAmount) > Mathf.Abs(angleDiff)) {
+				turnAmount = angleDiff;
 			}
-			transform.Rotate(0, turnAmount, 0);
+
+			bool isTurning = Mathf.Abs(turnAmount) > 0.1;
+
+			float speed = MoveSpeed * speedFactor;
+
+			Vector3 velocity = transform.TransformDirection(new Vector3(0, 0, speed));
+			Vector3 moveAmount = velocity * deltaTime;
+
+			//Debug.Log(velocity);
+
+			if (speedFactor > 0.01) {
+				if (inputMove) {
+					transform.localPosition += moveAmount;
+				}
+				transform.Rotate(0, turnAmount, 0);
+			}
 		}
 	}
 
@@ -322,9 +379,13 @@ public class ThirdPersonControl : MonoBehaviour {
 			return;
 		}
 
+		FindClosestTarget();
+
 		CheckAir();
 
 		if (isAir) return;
+
+		Debug.Log("HQ:" + hitQuery);
 
 		UpdateInput();
 		UpdateAnimatorParameters();
@@ -336,69 +397,6 @@ public class ThirdPersonControl : MonoBehaviour {
 		}
 
 		ApplyMotion( Time.fixedDeltaTime );
-
-		////(Vector2 dirOne, bool move) = GetInput();
-		//Vector2 dirOne = Vector2.zero;
-		//bool move = false;
-		//bool punching = false;
-
-		//GetInput(out dirOne, out move, out punching);
-
-		//Vector2 dirNorm = dirOne.normalized;
-
-		//float deltaTime = Time.fixedDeltaTime;
-
-		//float angleDiff = GetSignedAngleTo(dirNorm);
-
-		//bool isMoving = dirOne.magnitude > 0.05 && move;
-		//bool isTurning = Mathf.Abs(lastTurn) > 0.1;
-
-		//float turnAmount = (isMoving?TurnSpeed:StaticTurnSpeed) * Mathf.Sign(angleDiff) * deltaTime;
-
-		//if (Mathf.Abs(turnAmount) > Mathf.Abs(angleDiff)) {
-		//	turnAmount = angleDiff;
-		//}
-
-		//lastTurn = turnAmount;
-
-		//float speedFactor = dirOne.magnitude;
-		//float speed = MoveSpeed * speedFactor;
-
-		//Vector3 velocity = transform.TransformDirection(new Vector3(0, 0, speed));
-		//Vector3 moveAmount = velocity * deltaTime;
-
-		//if (speedFactor > 0.01) {
-		//	if (move) {
-		//		transform.localPosition += moveAmount;
-		//	}
-		//	transform.Rotate(0, turnAmount, 0);
-		//}
-
-		////Debug.Log(isMoving + " " + isTurning);
-
-		//lastPosition = transform.position;
-
-		//// update and set animator variables
-
-		//if (Mathf.Abs(turnAmount) > 2 && isMoving) {
-		//	anSmoothDir.smoothTime = 0.5f;
-		//	anSmoothDir.target = Mathf.Sign(angleDiff);
-		//}
-		//else {
-		//	anSmoothDir.smoothTime = 0.2f;
-		//	anSmoothDir.target = 0;
-		//}
-
-		//anSmoothDir.Eval(deltaTime);
-
-		//if (move == false) speedFactor = 0;
-
-		//animator.SetFloat("Speed", speedFactor);
-		//animator.SetFloat("Direction", anSmoothDir );
-		//animator.SetBool("Moving", isMoving);
-		//animator.SetBool("Turning", isTurning);
-		//animator.SetBool("Punching", punching);
-
 	}
 
 	private void OnAnimatorMove() {

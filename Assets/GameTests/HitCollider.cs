@@ -14,6 +14,8 @@ public class HitCollider : MonoBehaviour {
 	UnitHealth unitHealth = null;
 	Collider collider = null;
 
+	List<Collider> contacts = new List<Collider>();
+
 	public UnitHealth GetOwner() {
 		return GetComponentInParent<UnitHealth>();
 	}
@@ -24,7 +26,7 @@ public class HitCollider : MonoBehaviour {
 		collider = GetComponent<Collider>();
     }
 
-	private void OnTriggerEnter(Collider other) {
+	void OnHitContact( Collider other ) {
 		if (unitHealth == null) return;
 
 		HitCollider otherHitCollider = other.GetComponent<HitCollider>();
@@ -33,6 +35,33 @@ public class HitCollider : MonoBehaviour {
 		if (unitHealth == otherHitCollider.unitHealth) return;
 
 		unitHealth.OnHitColliderContact(this, otherHitCollider);
+	}
+
+	private void OnTriggerEnter(Collider other) {
+		//if (unitHealth == null) return;
+
+		//HitCollider otherHitCollider = other.GetComponent<HitCollider>();
+
+		//if (otherHitCollider == null) return;
+		//if (unitHealth == otherHitCollider.unitHealth) return;
+
+		//unitHealth.OnHitColliderContact(this, otherHitCollider);
+
+		if (!contacts.Contains(other)) {
+			contacts.Add(other);
+			OnHitContact(other);
+		}
+	}
+
+	private void OnTriggerExit(Collider other) {
+		contacts.Remove(other);
+	}
+
+	private void OnTriggerStay(Collider other) {
+		if (!contacts.Contains(other)) {
+			contacts.Add(other);
+			OnHitContact(other);
+		}
 	}
 
 	// Update is called once per frame

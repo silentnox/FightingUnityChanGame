@@ -14,9 +14,9 @@ public class EnemyControl : MonoBehaviour {
 	}
 
 
-	public float MoveFactor = 1;
-	public float RunFactor = 1;
-	public float TurnFactor = 1;
+	//public float MoveFactor = 1;
+	//public float RunFactor = 1;
+	//public float TurnFactor = 1;
 
 	public float VisionRange = 8;
 	public float VisionAngle = 60;
@@ -27,6 +27,10 @@ public class EnemyControl : MonoBehaviour {
 
 	public float MinFiringRange = 1.5f;
 	public float MaxFiringRange = 8;
+
+	public float AimMaxAngleH = 90;
+	public float AimMinAngleV = -180;
+	public float AimMaxAngleV = 180;
 
 	public float OptimalFiringRange = 5;
 
@@ -47,25 +51,41 @@ public class EnemyControl : MonoBehaviour {
 	Vector3 navNextPoint;
 	float	navRemainDist;
 
-	bool	shouldRun = false;
-	//bool	shouldMove = false;
-	//bool	shouldTurn = false;
-	bool	shouldFire = false;
-	//float	signedAngle = 0;
+	public bool	shouldRun = false;
+	public bool	shouldFire = false;
+	public bool shouldAim = false;
 
 	Vector3 aimTarget;
+
+	bool isMoving = false;
+	bool isRotating = false;
 
 	NavMeshAgent agent;
 	Animator animator;
 	UnitHealth unitHealth;
 
 	public Transform lookTarget;
-	public Transform offset;
-	//public Quaternion offset2;
+
+	Smooth lookSmooth = new Smooth();
+
+	bool aimRotate = false;
+
+	void OnDeath() {
+		if(Weapon && DropWeaponOnDeath) {
+			Weapon.transform.parent = null;
+			//Weapon.GetComponent<Collider>().enabled = true;
+			Weapon.GetComponent<Rigidbody>().isKinematic = false;
+			Weapon.GetComponent<Rigidbody>().useGravity = true;
+			Weapon.GetComponent<Rigidbody>().detectCollisions = true;
+		}
+	}
 
 	void OnGunFire() {
 		if (Weapon) {
 			Weapon.HitTrigger();
+			if(Weapon.GetSalvoCounter() == 0) {
+				animator.SetInteger("Firing", 1);
+			}
 		}
 	}
 
@@ -115,30 +135,12 @@ public class EnemyControl : MonoBehaviour {
 		return true;
 	}
 
-	void FireWeapon() {
-		shouldFire = true;
-	}
-
-	void AimWeapon( Vector3 point ) {
-
-	}
-
 	void StopMoving() {
 		navNextPoint = transform.position;
 		navRemainDist = 0;
 
 		targetPos = transform.position;
 	}
-
-	void StopFiring() {
-		shouldFire = false; 
-	}
-
-	//float GetTurn() {
-	//	float turn = transform.rotation.eulerAngles.y % 360;
-	//	if (turn < 0) turn = 360 + turn;
-	//	return turn;
-	//}
 
 	void Start() {
 		targetPos	= transform.position;
@@ -152,29 +154,16 @@ public class EnemyControl : MonoBehaviour {
 		navNextPoint = transform.position;
 		navRemainDist = 0;
 
-		offset = animator.GetBoneTransform(HumanBodyBones.Spine);
+		//offset = animator.GetBoneTransform(HumanBodyBones.Spine);
 
 		animator.applyRootMotion = true;
+
+		unitHealth.OnDeath += OnDeath;
     }
 
-	//Vector3 GetNavPoint() {
-	//	agent.nextPosition = transform.position;
-
-	//	NavMeshPath path = new NavMeshPath();
-	//	bool valid = agent.CalculatePath(targetPos, path);
-
-	//	if (valid) {
-	//		Vector3 next = path.corners[1];
-
-	//		Vector3 dir = (next - transform.position).normalized;
-
-	//		//return dir;
-	//		return next;
-	//	}
-	//	else {
-	//		return Vector3.zero;
-	//	}
-	//}
+	private void OnDestroy() {
+		unitHealth.OnDeath -= OnDeath;
+	}
 
 	void Think() {
 	}
@@ -209,39 +198,16 @@ public class EnemyControl : MonoBehaviour {
 			navRemainDist = 0;
 			navNextPoint = transform.position;
 		}
-
-		//Vector3 delta = (navNextPoint - transform.position);
-		//Vector3 dir = delta.normalized;
-		////float dist = navRemainDist;
-
-		//signedAngle = Vector3.SignedAngle(transform.forward, dir, Vector3.up);
-
-		//if (Mathf.Abs(signedAngle) < 5) {
-		//	transform.Rotate(0, signedAngle, 0);
-		//}
-
-		//shouldTurn = Mathf.Abs(signedAngle) > 5;
-		//shouldMove = navRemainDist > agent.radius && !shouldTurn;
-
-		//if (!shouldMove) {
-		//	if (useTargetDir) {
-		//		signedAngle = Vector3.SignedAngle(transform.forward, targetDir, Vector3.up);
-		//		shouldTurn = Mathf.Abs(signedAngle) > 5;
-		//	}
-		//}
 	}
 
 	void UpdateMotion(float deltaTime) {
 
 		Vector3 delta = (navNextPoint - transform.position);
 		Vector3 dir = delta.normalized;
+		dir.y = 0;
 		float dist = navRemainDist;
 
 		float signedAngle = Vector3.SignedAngle(transform.forward, dir, Vector3.up);
-
-		if (Mathf.Abs(signedAngle) < 5) {
-			transform.Rotate(0, signedAngle, 0);
-		}
 
 		bool shouldTurn = Mathf.Abs(signedAngle) > 5;
 		bool shouldMove = dist > agent.radius && !shouldTurn;
@@ -251,6 +217,10 @@ public class EnemyControl : MonoBehaviour {
 				signedAngle = Vector3.SignedAngle(transform.forward, targetDir, Vector3.up);
 				shouldTurn = Mathf.Abs(signedAngle) > 5;
 			}
+		}
+
+		if (Mathf.Abs(signedAngle) < 5) {
+			transform.Rotate(0, signedAngle, 0);
 		}
 
 		//Debug.Log(shouldMove + " " + shouldTurn + " " + signedAngle + " " + dir + " " + GetTurn() + " " + Helpers.GetAngle360(dir));
@@ -268,51 +238,103 @@ public class EnemyControl : MonoBehaviour {
 		animator.SetInteger("Move", move);
 		animator.SetInteger("Direction", shouldTurn ? (int)Mathf.Sign(signedAngle) : 0);
 
-		if(shouldTurn) {
-			animator.speed = TurnFactor;
-		}
-		else {
-			if(shouldMove) {
-				if (shouldRun) {
-					animator.speed = RunFactor;
-				}
-				else {
-					animator.speed = MoveFactor;
-				}
-			}
-			else {
-				animator.speed = 1.0f;
-			}
-		}
-	}
-
-	void Update() {
-		//Think();
-		UpdateNavigation();
-		UpdateMotion(Time.deltaTime);
-
-		//animator.SetInteger("Direction", 1);
-
-		//if(shouldFire && Weapon) {
-		//	Weapon.HitTrigger();
+		//if(shouldTurn) {
+		//	animator.speed = TurnFactor;
+		//}
+		//else {
+		//	if(shouldMove) {
+		//		if (shouldRun) {
+		//			animator.speed = RunFactor;
+		//		}
+		//		else {
+		//			animator.speed = MoveFactor;
+		//		}
+		//	}
+		//	else {
+		//		animator.speed = 1.0f;
+		//	}
 		//}
 	}
 
-	private void LateUpdate() {
-		Transform tr = animator.GetBoneTransform(HumanBodyBones.Spine);
-		Quaternion q = tr.rotation;
-		tr.LookAt(lookTarget, Vector3.up);
-		//tr.rotation = offset2 * tr.rotation;
-		//tr.rotation = tr.rotation * q * Quaternion.Inverse(transform.rotation);
-		//tr.rotation = Quaternion.Inverse(transform.rotation);
-		//tr.rotation = transform.rotation * q * tr.rotation;
+	void UpdateAim() {
+		if (!lookTarget) return;
+		if (isMoving || isRotating) return;
+
+		Vector3 dir = (lookTarget.position - transform.position).normalized;
+		dir.y = 0;
+		float signedAngle = Vector3.SignedAngle(transform.forward, dir, Vector3.up);
+
+		if (Mathf.Abs(signedAngle) < 8) aimRotate = false;
+
+		if(shouldAim && (Mathf.Abs(signedAngle) > AimMaxAngleH || aimRotate)) {
+			targetDir = dir;
+			useTargetDir = true;
+			animator.SetInteger("Firing", 0);
+			aimRotate = true;
+	
+			return;
+		}
+		//Debug.Log(signedAngle);
+		useTargetDir = false;
+
+		int firing = shouldAim ? 1 : 0;
+
+		bool animAiming = animator.GetCurrentAnimatorStateInfo(0).shortNameHash == Animator.StringToHash("Aiming") && animator.GetAnimatorTransitionInfo(0).duration < 0.001;
+
+		if (animAiming && shouldFire && Weapon && Weapon.GetSalvoCounter() > 0 && lookSmooth.current > 0.98) {
+			firing = 2;
+		}
+
+		animator.SetInteger("Firing", firing);
 	}
+
+	void Update() {
+		if(unitHealth && unitHealth.IsDead()) {
+			return;
+		}
+
+		//Think();
+		UpdateNavigation();
+		UpdateMotion(Time.deltaTime);
+		UpdateAim();
+
+		//Debug.Log(animator.GetAnimatorTransitionInfo(0).duration);
+	}
+
+	private void LateUpdate() {
+		if (unitHealth && unitHealth.IsDead()) {
+			return;
+		}
+
+		lookSmooth.smoothTime = 0.5f;
+		lookSmooth.target = shouldAim && !aimRotate? 1f : 0f;
+		if (!lookTarget) lookSmooth.target = 0f;
+		lookSmooth.Eval(Time.deltaTime);
+		if (!isMoving && !isRotating /*&& shouldAim*/) {
+			Transform tr = animator.GetBoneTransform(HumanBodyBones.Spine);
+			Quaternion q = tr.rotation;
+			tr.LookAt(lookTarget, Vector3.up);
+			tr.rotation = Quaternion.Slerp(q, tr.rotation, lookSmooth);
+			tr.rotation = tr.rotation * q * Quaternion.Inverse(transform.rotation);
+		}
+	}
+
 	private void OnAnimatorMove() {
+		if (unitHealth && unitHealth.IsDead()) {
+			return;
+		}
+
 		Vector3 pos = animator.deltaPosition;
-		Debug.Log(pos.magnitude);
+		//Debug.Log(pos.magnitude);
 		//animator.ApplyBuiltinRootMotion();
 		transform.position += pos;
 		transform.rotation = animator.deltaRotation * transform.rotation;
+
+		isMoving = animator.deltaPosition.magnitude > 0.01;
+		isRotating = animator.deltaRotation != new Quaternion(0,0,0,1);
+
+		//Debug.Log("M: R: " + isMoving + " " + isRotating);
+		//Debug.Log(animator.deltaRotation);
 	}
 
 	private void OnDrawGizmos() {

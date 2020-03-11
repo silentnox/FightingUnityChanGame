@@ -19,7 +19,7 @@ public class ClickToMove : MonoBehaviour {
 				GetComponent<EnemyControl>().SetDestination( hitInfo.point );
 				//GetComponent<NavMeshAgent>().SetDestination( hitInfo.point );
 			}
-			Debug.Log("CTM");
+			//Debug.Log("CTM");
 		}
 	}
 }

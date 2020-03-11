@@ -43,7 +43,7 @@ public class UnitHealth : MonoBehaviour {
 	}
 
 	public bool IsDead() {
-		return Health < 0;
+		return Health <= 0;
 	}
 
 	public void ActivateRagdoll( bool activate ) {
@@ -80,7 +80,7 @@ public class UnitHealth : MonoBehaviour {
 
 	public void Damage( float amount, GameObject attacker =null, Vector3? from = null ) {
 		if (Invulnerable) return;
-		if (Health < 0) return;
+		if (Health <= 0) return;
 
 		Health -= amount;
 
@@ -91,11 +91,11 @@ public class UnitHealth : MonoBehaviour {
 		OnDamage?.Invoke();
 
 		if(Health < 0 + Mathf.Epsilon) {
-			OnDeath?.Invoke();
-
 			if(RagdollOnDeath) {
 				ActivateRagdoll(true);
 			}
+
+			OnDeath?.Invoke();
 		}
 	}
 
