@@ -31,7 +31,7 @@ public class HitCollider : MonoBehaviour {
 
 		HitCollider otherHitCollider = other.GetComponent<HitCollider>();
 
-		if (otherHitCollider == null) return;
+		if (otherHitCollider == null || !otherHitCollider.enabled) return;
 		if (unitHealth == otherHitCollider.unitHealth) return;
 
 		unitHealth.OnHitColliderContact(this, otherHitCollider);

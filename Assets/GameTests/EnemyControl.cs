@@ -5,13 +5,13 @@ using UnityEngine.AI;
 
 public class EnemyControl : MonoBehaviour {
 
-	public enum State {
-		Idle,
-		Turning,
-		Walking,
-		Running,
-		Firing
-	}
+	//public enum State {
+	//	Idle,
+	//	Turning,
+	//	Walking,
+	//	Running,
+	//	Firing
+	//}
 
 
 	//public float MoveFactor = 1;
@@ -23,7 +23,7 @@ public class EnemyControl : MonoBehaviour {
 	public float AbsVisionRange = 0;
 
 	public float AlertTime = 8;
-	public float ChaseTime = 4;
+	//public float ChaseTime = 4;
 
 	public float MinFiringRange = 1.5f;
 	public float MaxFiringRange = 8;
@@ -34,26 +34,32 @@ public class EnemyControl : MonoBehaviour {
 
 	public float OptimalFiringRange = 5;
 
-	public float AllyAlertRange = 0;
-	public bool ChainAlert = false;
+	//public float AllyAlertRange = 0;
+	//public bool ChainAlert = false;
 
 	public bool DropWeaponOnDeath = true;
 
 	public GunHelper Weapon = null;
 
 	UnitHealth targetEnemy = null;
+	float distToEnemy = 0.0f;
+
 	float alertTimer = 0;
+
+	Vector3 lastSeenEnemyPos;
 
 	Vector3 targetPos;
 	Vector3	targetDir;
-	bool	useTargetDir = false;
+	//bool	useTargetDir = false;
 
 	Vector3 navNextPoint;
 	float	navRemainDist;
 
+	public bool shouldWalk = false;
 	public bool	shouldRun = false;
 	public bool	shouldFire = false;
 	public bool shouldAim = false;
+	public bool shouldWalkBack = false;
 
 	Vector3 aimTarget;
 
@@ -64,11 +70,14 @@ public class EnemyControl : MonoBehaviour {
 	Animator animator;
 	UnitHealth unitHealth;
 
-	public Transform lookTarget;
+	//public Transform lookTarget;
+	Vector3 lookTarget;
 
 	Smooth lookSmooth = new Smooth();
 
 	bool aimRotate = false;
+
+	bool moveIntoRange = false;
 
 	void OnDeath() {
 		if(Weapon && DropWeaponOnDeath) {
@@ -78,6 +87,22 @@ public class EnemyControl : MonoBehaviour {
 			Weapon.GetComponent<Rigidbody>().useGravity = true;
 			Weapon.GetComponent<Rigidbody>().detectCollisions = true;
 		}
+
+		HitCollider[] colliders = GetComponentsInChildren<HitCollider>();
+
+		foreach(HitCollider c in colliders) {
+			c.enabled = false;
+		}
+	}
+
+	void OnReceiveHit(HitCollider self, HitCollider other) {
+		if (unitHealth.Health > 0) {
+			animator.SetTrigger("Hit");
+		}
+	}
+
+	void OnDamage(float amount) {
+
 	}
 
 	void OnGunFire() {
@@ -96,13 +121,13 @@ public class EnemyControl : MonoBehaviour {
 	public void SetDestination(Vector3 position) {
 		targetPos	= position;
 		targetDir	= Vector3.zero;
-		useTargetDir = false;
+		//useTargetDir = false;
 	}
 
 	public void SetDestination(Vector3 position, Vector3 dir) {
 		targetPos	= position;
 		targetDir	= dir;
-		useTargetDir = true;
+		//useTargetDir = true;
 	}
 
 	bool ScanTargets() {
@@ -128,10 +153,53 @@ public class EnemyControl : MonoBehaviour {
 			}
 		}
 
+		distToEnemy = minDist;
+
 		return targetEnemy != null;
 	}
 
-	bool IsVisible( Vector3 point ) {
+	bool IsVisible(Vector3 point) {
+		//return true;
+
+		Transform head = animator.GetBoneTransform(HumanBodyBones.Head);
+
+		Vector3 diff = point - transform.position;
+		float heightDiff = diff.y;
+		diff.y = 0;
+		Vector2 dir = diff.normalized;
+		float angle = Mathf.Abs( Vector3.SignedAngle(dir, transform.forward,Vector3.up) );
+		float dist = diff.magnitude;
+		float headDist = Vector3.Distance(head.position, point);
+
+		RaycastHit hit;
+		int layerMask = ~(1 << LayerMask.NameToLayer("Units"));
+		Physics.Raycast(new Ray(head.position,diff.normalized), out hit, Mathf.Infinity, layerMask);
+
+		if(hit.distance < headDist) {
+			//if (targetEnemy != null && hit.collider.GetComponentInParent<UnitHealth>() != targetEnemy.GetComponent<UnitHealth>()) {
+				return false;
+			//}
+		}
+
+		if(heightDiff > 5) {
+			return false;
+		}
+
+		if(dist < AbsVisionRange) {
+			return true;
+		}
+
+		if (alertTimer > 0) {
+			if(dist > VisionRange) {
+				return false;
+			}
+		}
+		else {
+			if(dist > VisionRange || angle > VisionAngle) {
+				return false;
+			}
+		}
+
 		return true;
 	}
 
@@ -159,13 +227,79 @@ public class EnemyControl : MonoBehaviour {
 		animator.applyRootMotion = true;
 
 		unitHealth.OnDeath += OnDeath;
+		unitHealth.OnReceiveHit += OnReceiveHit;
     }
 
 	private void OnDestroy() {
 		unitHealth.OnDeath -= OnDeath;
+		unitHealth.OnReceiveHit -= OnReceiveHit;
 	}
 
 	void Think() {
+		shouldAim = false;
+		shouldFire = false;
+		shouldRun = false;
+		shouldWalk = false;
+		shouldWalkBack = false;
+		//useTargetDir = false;
+
+		targetDir = Vector3.zero;
+		targetPos = transform.position;
+
+		ScanTargets();
+
+		if (alertTimer > 0) alertTimer -= Time.deltaTime;
+
+		if(!Weapon) {
+			return;
+		}
+
+		if(alertTimer > 0) {
+			shouldRun = true;
+		}
+
+		if(!targetEnemy) {
+
+			if(alertTimer > 0) {
+				targetPos = lastSeenEnemyPos;
+			}
+
+			return;
+		}
+
+		alertTimer = AlertTime;
+
+		//lookTarget = null;
+
+		Transform enemyTransform = targetEnemy.transform;
+
+		if(enemyTransform.GetComponent<Animator>() && enemyTransform.GetComponent<Animator>().isHuman) {
+			enemyTransform = enemyTransform.GetComponent<Animator>().GetBoneTransform(HumanBodyBones.Chest);
+		}
+
+		if(distToEnemy < MinFiringRange) {
+			shouldWalkBack = true;
+		}
+		else {
+			if(distToEnemy > MaxFiringRange) {
+				targetPos = targetEnemy.transform.position;
+				moveIntoRange = true;
+			}
+			else {
+				if(distToEnemy > OptimalFiringRange && moveIntoRange) {
+					targetPos = targetEnemy.transform.position;
+				}
+				else {
+					//lookTarget = enemyTransform;
+					lookTarget = enemyTransform.position;
+					shouldAim = true;
+					shouldFire = true;
+					moveIntoRange = false;
+				}
+			}
+		}
+
+		lastSeenEnemyPos = targetEnemy.transform.position;
 	}
 
 	void UpdateNavigation() {
@@ -213,7 +347,8 @@ public class EnemyControl : MonoBehaviour {
 		bool shouldMove = dist > agent.radius && !shouldTurn;
 
 		if (!shouldMove) {
-			if (useTargetDir) {
+			//if (useTargetDir) {
+			if (targetDir != Vector3.zero) {
 				signedAngle = Vector3.SignedAngle(transform.forward, targetDir, Vector3.up);
 				shouldTurn = Mathf.Abs(signedAngle) > 5;
 			}
@@ -233,34 +368,23 @@ public class EnemyControl : MonoBehaviour {
 			move = shouldRun ? 2 : 1;
 		}
 
+		if(shouldWalkBack) {
+			move = -1;
+		}
+
 		//move = 1;
 
 		animator.SetInteger("Move", move);
 		animator.SetInteger("Direction", shouldTurn ? (int)Mathf.Sign(signedAngle) : 0);
-
-		//if(shouldTurn) {
-		//	animator.speed = TurnFactor;
-		//}
-		//else {
-		//	if(shouldMove) {
-		//		if (shouldRun) {
-		//			animator.speed = RunFactor;
-		//		}
-		//		else {
-		//			animator.speed = MoveFactor;
-		//		}
-		//	}
-		//	else {
-		//		animator.speed = 1.0f;
-		//	}
-		//}
 	}
 
 	void UpdateAim() {
-		if (!lookTarget) return;
+		//if (!lookTarget) return;
+		if (!shouldAim) return;
 		if (isMoving || isRotating) return;
 
-		Vector3 dir = (lookTarget.position - transform.position).normalized;
+		//Vector3 dir = (lookTarget.position - transform.position).normalized;
+		Vector3 dir = (lookTarget - transform.position).normalized;
 		dir.y = 0;
 		float signedAngle = Vector3.SignedAngle(transform.forward, dir, Vector3.up);
 
@@ -268,14 +392,16 @@ public class EnemyControl : MonoBehaviour {
 
 		if(shouldAim && (Mathf.Abs(signedAngle) > AimMaxAngleH || aimRotate)) {
 			targetDir = dir;
-			useTargetDir = true;
+			//useTargetDir = true;
 			animator.SetInteger("Firing", 0);
 			aimRotate = true;
 	
 			return;
 		}
+
 		//Debug.Log(signedAngle);
-		useTargetDir = false;
+		//useTargetDir = false;
+		targetDir = Vector3.zero;
 
 		int firing = shouldAim ? 1 : 0;
 
@@ -293,10 +419,12 @@ public class EnemyControl : MonoBehaviour {
 			return;
 		}
 
-		//Think();
+		Think();
 		UpdateNavigation();
-		UpdateMotion(Time.deltaTime);
 		UpdateAim();
+		UpdateMotion(Time.deltaTime);
+
+		Debug.Log(alertTimer + " " + distToEnemy);
 
 		//Debug.Log(animator.GetAnimatorTransitionInfo(0).duration);
 	}
@@ -308,9 +436,13 @@ public class EnemyControl : MonoBehaviour {
 
 		lookSmooth.smoothTime = 0.5f;
 		lookSmooth.target = shouldAim && !aimRotate? 1f : 0f;
-		if (!lookTarget) lookSmooth.target = 0f;
+
+		//if (!lookTarget) lookSmooth.target = 0f;
+		if (!shouldAim) lookSmooth.target = 0f;
+
 		lookSmooth.Eval(Time.deltaTime);
-		if (!isMoving && !isRotating /*&& shouldAim*/) {
+
+		if (!isMoving && !isRotating) {
 			Transform tr = animator.GetBoneTransform(HumanBodyBones.Spine);
 			Quaternion q = tr.rotation;
 			tr.LookAt(lookTarget, Vector3.up);

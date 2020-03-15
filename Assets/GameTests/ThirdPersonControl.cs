@@ -22,6 +22,7 @@ public class ThirdPersonControl : MonoBehaviour {
 	Vector2 inputDir = Vector2.zero;
 	bool inputMove = false;
 	bool inputPunch = false;
+	bool inputRoll = false;
 	bool inputAnimateLocomotion = true;
 
 	// cached component refs
@@ -163,6 +164,7 @@ public class ThirdPersonControl : MonoBehaviour {
 
 		inputMove = false;
 		inputPunch = false;
+		inputRoll = false;
 
 		inputMove = inputDir.magnitude > 0.01;
 
@@ -218,6 +220,10 @@ public class ThirdPersonControl : MonoBehaviour {
 			inputDir = Vector2.zero;
 			inputPunch = false;
 		}
+
+		if(Input.GetKeyDown(KeyCode.X)) {
+			inputRoll = true;
+		}
 		//Debug.Log(hitQuery);
 	}
 
@@ -234,6 +240,8 @@ public class ThirdPersonControl : MonoBehaviour {
 
 		StateMachineControl.onStateEnter += OnAnimatorStateEnter;
 		StateMachineControl.onStateExit += OnAnimatorStateExit;
+
+		OnPunchActivate(0);
 	}
 
 	private void OnDestroy() {
@@ -306,6 +314,9 @@ public class ThirdPersonControl : MonoBehaviour {
 	}
 
 	void UpdateAnimatorParameters() {
+
+		if (isAir) return;
+
 		float speedFactor = inputDir.magnitude;
 		bool isMoving = speedFactor > 0.1 && inputMove;
 		float angleDiff = GetSignedAngleTo(inputDir);
@@ -331,6 +342,10 @@ public class ThirdPersonControl : MonoBehaviour {
 		if(inputPunch && hitCounter == 0) animator.SetTrigger("Punching");
 		if(inputPunch && hitCounter == 1) animator.SetTrigger("Punching1");
 		if(inputPunch && hitCounter == 2) animator.SetTrigger("Punching2");
+
+		if(inputRoll) {
+			animator.SetTrigger("Roll");
+		}
 	}
 	
 	void UpdateLastPosition() {
@@ -338,6 +353,8 @@ public class ThirdPersonControl : MonoBehaviour {
 	}
 
 	void ApplyMotion( float deltaTime ) {
+
+		if (isAir) return;
 
 		float dashFactor = animator.GetFloat("DashFactor");
 		transform.Translate(new Vector3(0, 0, dashFactor * 0.1f), Space.Self);
@@ -383,9 +400,7 @@ public class ThirdPersonControl : MonoBehaviour {
 
 		CheckAir();
 
-		if (isAir) return;
-
-		Debug.Log("HQ:" + hitQuery);
+		//Debug.Log("HQ:" + hitQuery);
 
 		UpdateInput();
 		UpdateAnimatorParameters();

@@ -24,9 +24,11 @@ public class UnitHealth : MonoBehaviour {
 	bool ragdollActive = false;
 
 	[HideInInspector]
-	public event Action OnDamage;
+	public event Action<float> OnDamage;
 	[HideInInspector]
 	public event Action OnDeath;
+	[HideInInspector]
+	public event Action AfterRagdoll;
 	[HideInInspector]
 	public event Action<HitCollider,HitCollider> OnInflictHit;
 	[HideInInspector]
@@ -37,6 +39,8 @@ public class UnitHealth : MonoBehaviour {
 
 	Vector3 lastDamageDir = Vector3.zero;
 	Vector3 lastDamagePos = Vector3.zero;
+
+
 
 	public bool IsRagdoll() {
 		return ragdollActive;
@@ -75,6 +79,10 @@ public class UnitHealth : MonoBehaviour {
 
 		ragdollActive = activate;
 
+		if(ragdollActive) {
+			AfterRagdoll?.Invoke();
+		}
+
 		Debug.Log("Ragdoll: " + ragdollActive);
 	}
 
@@ -88,13 +96,12 @@ public class UnitHealth : MonoBehaviour {
 			regenDelay = DamageRegenDelay;
 		}
 
-		OnDamage?.Invoke();
+		OnDamage?.Invoke(amount);
 
 		if(Health < 0 + Mathf.Epsilon) {
-			if(RagdollOnDeath) {
+			if (RagdollOnDeath) {
 				ActivateRagdoll(true);
 			}
-
 			OnDeath?.Invoke();
 		}
 	}
