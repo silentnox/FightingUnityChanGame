@@ -56,13 +56,13 @@ ModelImporter:
       loopBlendPositionXZ: 1
       keepOriginalOrientation: 1
       keepOriginalPositionY: 1
-      keepOriginalPositionXZ: 0
+      keepOriginalPositionXZ: 1
       heightFromFeet: 0
       mirror: 0
       bodyMask: 01000000010000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000
       curves: []
       events:
-      - time: 0.1778121
+      - time: 0
         functionName: OnGunFire
         data: 
         objectReferenceParameter: {instanceID: 0}
@@ -92,7 +92,7 @@ ModelImporter:
       loopBlendPositionXZ: 1
       keepOriginalOrientation: 1
       keepOriginalPositionY: 1
-      keepOriginalPositionXZ: 0
+      keepOriginalPositionXZ: 1
       heightFromFeet: 0
       mirror: 0
       bodyMask: 01000000010000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000

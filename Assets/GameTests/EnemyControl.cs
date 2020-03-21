@@ -5,13 +5,13 @@ using UnityEngine.AI;
 
 public class EnemyControl : MonoBehaviour {
 
-	//public enum State {
-	//	Idle,
-	//	Turning,
-	//	Walking,
-	//	Running,
-	//	Firing
-	//}
+	public enum State {
+		Idle,
+		Turning,
+		Moving,
+		Aiming,
+		Firing
+	}
 
 
 	//public float MoveFactor = 1;
@@ -41,6 +41,10 @@ public class EnemyControl : MonoBehaviour {
 
 	public GunHelper Weapon = null;
 
+	public PatrolPoint StartPatrolPoint = null;
+
+	State state = State.Idle;
+
 	UnitHealth targetEnemy = null;
 	float distToEnemy = 0.0f;
 
@@ -54,6 +58,14 @@ public class EnemyControl : MonoBehaviour {
 
 	Vector3 navNextPoint;
 	float	navRemainDist;
+	Vector3 navMoveDir,navMoveDir2;
+
+	PatrolPoint patrolPoint = null;
+	Vector3 patrolPos;
+	bool returnToPatrol = false;
+	float patrolTimer = 0;
+	bool patrolMovingToNext = false;
+	bool patrolMovingBack = false;
 
 	public bool shouldWalk = false;
 	public bool	shouldRun = false;
@@ -79,6 +91,8 @@ public class EnemyControl : MonoBehaviour {
 
 	bool moveIntoRange = false;
 
+	float rotateAngleDelta;
+
 	void OnDeath() {
 		if(Weapon && DropWeaponOnDeath) {
 			Weapon.transform.parent = null;
@@ -99,6 +113,7 @@ public class EnemyControl : MonoBehaviour {
 		if (unitHealth.Health > 0) {
 			animator.SetTrigger("Hit");
 		}
+		alertTimer = AlertTime;
 	}
 
 	void OnDamage(float amount) {
@@ -111,6 +126,16 @@ public class EnemyControl : MonoBehaviour {
 			if(Weapon.GetSalvoCounter() == 0) {
 				animator.SetInteger("Firing", 1);
 			}
+		}
+	}
+
+	private void OnCollisionEnter(Collision collision) {
+		GetComponent<Rigidbody>().isKinematic = false;
+		if (collision.gameObject.GetComponent<UnitHealth>()) {
+			GetComponent<Rigidbody>().isKinematic = true;
+		}
+		foreach(ContactPoint cp in collision.contacts) {
+			//collision.
 		}
 	}
 
@@ -128,6 +153,13 @@ public class EnemyControl : MonoBehaviour {
 		targetPos	= position;
 		targetDir	= dir;
 		//useTargetDir = true;
+	}
+
+	float GetAngleTo( Vector3 point ) {
+		Vector3 dir = (point - transform.position);
+		dir.y = 0;
+		dir = dir.normalized;
+		return Vector3.SignedAngle(transform.forward, dir, Vector3.up);
 	}
 
 	bool ScanTargets() {
@@ -222,6 +254,9 @@ public class EnemyControl : MonoBehaviour {
 		navNextPoint = transform.position;
 		navRemainDist = 0;
 
+		patrolPos = transform.position;
+		patrolPoint = StartPatrolPoint;
+
 		//offset = animator.GetBoneTransform(HumanBodyBones.Spine);
 
 		animator.applyRootMotion = true;
@@ -248,58 +283,117 @@ public class EnemyControl : MonoBehaviour {
 
 		ScanTargets();
 
-		if (alertTimer > 0) alertTimer -= Time.deltaTime;
+		bool alertExpired = false;
 
-		if(!Weapon) {
-			return;
+		if (alertTimer > 0) {
+			alertTimer -= Time.deltaTime;
+
+			if(alertTimer < 0) {
+				alertExpired = true;
+			}
 		}
+		if (patrolTimer > 0) {
+			patrolTimer -= Time.deltaTime;
+		}
+
+		//if(!Weapon) {
+		//	return;
+		//}
 
 		if(alertTimer > 0) {
 			shouldRun = true;
 		}
 
-		if(!targetEnemy) {
+		if (!targetEnemy) {
 
-			if(alertTimer > 0) {
+			if (alertTimer > 0) {
 				targetPos = lastSeenEnemyPos;
 			}
-
-			return;
-		}
-
-		alertTimer = AlertTime;
-
-		//lookTarget = null;
-
-		Transform enemyTransform = targetEnemy.transform;
-
-		if(enemyTransform.GetComponent<Animator>() && enemyTransform.GetComponent<Animator>().isHuman) {
-			enemyTransform = enemyTransform.GetComponent<Animator>().GetBoneTransform(HumanBodyBones.Chest);
-		}
-
-		if(distToEnemy < MinFiringRange) {
-			shouldWalkBack = true;
-		}
-		else {
-			if(distToEnemy > MaxFiringRange) {
-				targetPos = targetEnemy.transform.position;
-				moveIntoRange = true;
-			}
 			else {
-				if(distToEnemy > OptimalFiringRange && moveIntoRange) {
-					targetPos = targetEnemy.transform.position;
+				if (alertExpired) {
+					returnToPatrol = true;
+				}
+
+				if (returnToPatrol) {
+					targetPos = patrolPos;
 				}
 				else {
-					//lookTarget = enemyTransform;
-					lookTarget = enemyTransform.position;
-					shouldAim = true;
-					shouldFire = true;
-					moveIntoRange = false;
+					patrolPos = transform.position;
+
+					if (patrolPoint) {
+						if (Vector3.Distance(transform.position, patrolPoint.transform.position) < 0.5 && patrolMovingToNext) {
+							patrolTimer = patrolPoint.WaitTime;
+							patrolMovingToNext = false;
+						}
+						else {
+							patrolTimer -= Time.deltaTime;
+						}
+
+						if (patrolTimer < 0 && !patrolMovingToNext) {
+							if (!patrolMovingBack) {
+								patrolPoint = patrolPoint.GetNextPatrolPoint();
+							}
+							else {
+								patrolPoint = patrolPoint.GetPrevPatrolPoint();
+							}
+
+							if (!patrolPoint) patrolMovingBack = !patrolMovingBack;
+
+							patrolMovingToNext = true;
+						}
+
+						if (patrolPoint) {
+							targetPos = patrolPoint.transform.position;
+
+							if (patrolPoint.UseDirection) {
+								targetDir = patrolPoint.transform.forward;
+							}
+						}
+					}
 				}
 			}
-		}
 
-		lastSeenEnemyPos = targetEnemy.transform.position;
+			if (Vector3.Distance(transform.position, patrolPos) < 0.5) {
+				returnToPatrol = false;
+			}
+
+			//return;
+		}
+		else {
+			alertTimer = AlertTime;
+
+			//lookTarget = null;
+
+			Transform enemyTransform = targetEnemy.transform;
+
+			if (enemyTransform.GetComponent<Animator>() && enemyTransform.GetComponent<Animator>().isHuman) {
+				enemyTransform = enemyTransform.GetComponent<Animator>().GetBoneTransform(HumanBodyBones.Chest);
+			}
+
+			if (distToEnemy < MinFiringRange) {
+				shouldWalkBack = true;
+			}
+			else {
+				if (distToEnemy > MaxFiringRange) {
+					targetPos = targetEnemy.transform.position;
+					moveIntoRange = true;
+				}
+				else {
+					if (distToEnemy > OptimalFiringRange && moveIntoRange) {
+						targetPos = targetEnemy.transform.position;
+					}
+					else {
+						//lookTarget = enemyTransform;
+						lookTarget = enemyTransform.position;
+						shouldAim = true;
+						shouldFire = true;
+						moveIntoRange = false;
+					}
+				}
+			}
+
+			lastSeenEnemyPos = targetEnemy.transform.position;
+		}
 	}
 
 	void UpdateNavigation() {
@@ -332,19 +426,27 @@ public class EnemyControl : MonoBehaviour {
 			navRemainDist = 0;
 			navNextPoint = transform.position;
 		}
+
+		Vector3 delta = (navNextPoint - transform.position);
+		navMoveDir = delta.normalized;
+		navMoveDir2 = delta.SetY(0).normalized;
+		//navMoveDir.y = 0;
 	}
 
 	void UpdateMotion(float deltaTime) {
 
-		Vector3 delta = (navNextPoint - transform.position);
-		Vector3 dir = delta.normalized;
-		dir.y = 0;
-		float dist = navRemainDist;
+		//if (!shouldWalk && !shouldWalkBack) return;
 
-		float signedAngle = Vector3.SignedAngle(transform.forward, dir, Vector3.up);
+		//Vector3 delta = (navNextPoint - transform.position);
+		//Vector3 dir = delta.normalized;
+		//dir.y = 0;
+		//float dist = navRemainDist;
+
+		//float signedAngle = Vector3.SignedAngle(transform.forward, dir, Vector3.up);
+		float signedAngle = Vector3.SignedAngle(transform.forward, navMoveDir2, Vector3.up);
 
 		bool shouldTurn = Mathf.Abs(signedAngle) > 5;
-		bool shouldMove = dist > agent.radius && !shouldTurn;
+		bool shouldMove = navRemainDist > agent.radius && !shouldTurn;
 
 		if (!shouldMove) {
 			//if (useTargetDir) {
@@ -354,9 +456,14 @@ public class EnemyControl : MonoBehaviour {
 			}
 		}
 
+		//if (Mathf.Abs(signedAngle) < 5) {
+		//	transform.Rotate(0, signedAngle, 0);
+		//}
 		if (Mathf.Abs(signedAngle) < 5) {
 			transform.Rotate(0, signedAngle, 0);
 		}
+
+		rotateAngleDelta = signedAngle;
 
 		//Debug.Log(shouldMove + " " + shouldTurn + " " + signedAngle + " " + dir + " " + GetTurn() + " " + Helpers.GetAngle360(dir));
 
@@ -372,20 +479,31 @@ public class EnemyControl : MonoBehaviour {
 			move = -1;
 		}
 
-		//move = 1;
-
 		animator.SetInteger("Move", move);
 		animator.SetInteger("Direction", shouldTurn ? (int)Mathf.Sign(signedAngle) : 0);
+
+		if (shouldTurn) {
+			state = State.Turning;
+		}
+		else {
+			if (shouldMove || shouldWalkBack) {
+				state = State.Moving;
+			}
+			else {
+				state = State.Idle;
+			}
+		}
 	}
 
 	void UpdateAim() {
 		//if (!lookTarget) return;
-		if (!shouldAim) return;
-		if (isMoving || isRotating) return;
+		//if (!shouldAim) return;
+		//if (isMoving || isRotating) return;
 
 		//Vector3 dir = (lookTarget.position - transform.position).normalized;
-		Vector3 dir = (lookTarget - transform.position).normalized;
-		dir.y = 0;
+		//Vector3 dir = (lookTarget - transform.position).normalized;
+		//dir.y = 0;
+		Vector3 dir = (lookTarget - transform.position).SetY(0).normalized;
 		float signedAngle = Vector3.SignedAngle(transform.forward, dir, Vector3.up);
 
 		if (Mathf.Abs(signedAngle) < 8) aimRotate = false;
@@ -401,17 +519,25 @@ public class EnemyControl : MonoBehaviour {
 
 		//Debug.Log(signedAngle);
 		//useTargetDir = false;
-		targetDir = Vector3.zero;
+		//targetDir = Vector3.zero;
 
-		int firing = shouldAim ? 1 : 0;
+		//int firing = shouldAim ? 1 : 0;
 
-		bool animAiming = animator.GetCurrentAnimatorStateInfo(0).shortNameHash == Animator.StringToHash("Aiming") && animator.GetAnimatorTransitionInfo(0).duration < 0.001;
+		//bool animAiming = animator.GetCurrentAnimatorStateInfo(0).shortNameHash == Animator.StringToHash("Aiming") && animator.GetAnimatorTransitionInfo(0).duration < 0.001;
 
-		if (animAiming && shouldFire && Weapon && Weapon.GetSalvoCounter() > 0 && lookSmooth.current > 0.98) {
-			firing = 2;
-		}
+		//if (animAiming && shouldFire && Weapon && Weapon.GetSalvoCounter() > 0 && lookSmooth.current > 0.98) {
+		//	firing = 2;
+		//}
+
+		int firing = 0;
+
+		if (shouldAim) firing = 1;
+		if (shouldFire && Weapon && Weapon.GetSalvoCounter() > 0) firing = 2;
 
 		animator.SetInteger("Firing", firing);
+
+		if (firing == 1) state = State.Aiming;
+		else if (firing == 2) state = State.Firing;
 	}
 
 	void Update() {
@@ -424,9 +550,15 @@ public class EnemyControl : MonoBehaviour {
 		UpdateAim();
 		UpdateMotion(Time.deltaTime);
 
-		Debug.Log(alertTimer + " " + distToEnemy);
+		Debug.Log(targetDir);
+
+		//Debug.Log(alertTimer + " " + distToEnemy);
 
 		//Debug.Log(animator.GetAnimatorTransitionInfo(0).duration);
+	}
+
+	private void FixedUpdate() {
+		//UpdateMotion(Time.fixedDeltaTime);
 	}
 
 	private void LateUpdate() {
@@ -434,7 +566,7 @@ public class EnemyControl : MonoBehaviour {
 			return;
 		}
 
-		lookSmooth.smoothTime = 0.5f;
+		lookSmooth.smoothTime = 0.3f;
 		lookSmooth.target = shouldAim && !aimRotate? 1f : 0f;
 
 		//if (!lookTarget) lookSmooth.target = 0f;
@@ -449,12 +581,26 @@ public class EnemyControl : MonoBehaviour {
 			tr.rotation = Quaternion.Slerp(q, tr.rotation, lookSmooth);
 			tr.rotation = tr.rotation * q * Quaternion.Inverse(transform.rotation);
 		}
+
+		//float angle = Vector3.SignedAngle(transform.forward.SetY(0), targetDir, Vector3.up);
+		//if (Mathf.Sign(rotateAngleDelta) != Mathf.Sign(angle) && state == State.Turning && targetDir != Vector3.zero) {
+		//	transform.Rotate(0, -angle, 0);
+		//}
+
+		//Debug.Log(rotateAngleDelta + " " + angle);
+		GetComponent<Rigidbody>().isKinematic = false;
 	}
 
 	private void OnAnimatorMove() {
 		if (unitHealth && unitHealth.IsDead()) {
 			return;
 		}
+
+		//float rot = rotateAngleDelta;
+		//float deltaRot = animator.deltaRotation.eulerAngles.y;
+		//if(Mathf.Abs(deltaRot) > Mathf.Abs(rot)) {
+		//	deltaRot = rot;
+		//}
 
 		Vector3 pos = animator.deltaPosition;
 		//Debug.Log(pos.magnitude);
@@ -474,5 +620,6 @@ public class EnemyControl : MonoBehaviour {
 		Gizmos.DrawSphere(targetPos, 0.1f);
 		Gizmos.color = Color.green;
 		Gizmos.DrawSphere(navNextPoint, 0.1f);
+		Gizmos.DrawLine(transform.position, transform.position + targetDir * 1);
 	}
 }

@@ -40,7 +40,7 @@ public class ThirdPersonControl : MonoBehaviour {
 	// number of times attack button was pressed
 	int hitQuery = 0;
 	int hitCounter = 0;
-	int HitQueryMax = 3;
+	//int HitQueryMax = 3;
 
 	// when processing attacking animation
 	bool activePunching = false;
@@ -93,6 +93,9 @@ public class ThirdPersonControl : MonoBehaviour {
 		if(stateInfo.shortNameHash == Animator.StringToHash("Locomotion")) {
 			activeLocomotion = true;
 		}
+		if(stateInfo.IsTag("Roll")) {
+			activeRoll = true;
+		}
 	}
 
 	public void OnAnimatorStateExit(Animator animator, AnimatorStateInfo stateInfo, int layerIndex) {
@@ -107,6 +110,9 @@ public class ThirdPersonControl : MonoBehaviour {
 		}
 		if (stateInfo.shortNameHash == Animator.StringToHash("Locomotion")) {
 			activeLocomotion = false;
+		}
+		if (stateInfo.IsTag("Roll")) {
+			activeRoll = false;
 		}
 	}
 
@@ -170,12 +176,12 @@ public class ThirdPersonControl : MonoBehaviour {
 
 		turnSpeed = (inputDir.magnitude > 0.7 ? TurnSpeed : StaticTurnSpeed);
 
-		// crouching
-		if (Input.GetKey(KeyCode.LeftShift)) {
-			inputDir.x *= 0.5f;
-			inputDir.y *= 0.5f;
-			//inputDir *= 0.5;
-		}
+		//// crouching
+		//if (Input.GetKey(KeyCode.LeftShift)) {
+		//	inputDir.x *= 0.5f;
+		//	inputDir.y *= 0.5f;
+		//	//inputDir *= 0.5;
+		//}
 
 		bool punching = false;
 		if (Input.GetKeyDown(KeyCode.Z)) {
@@ -186,7 +192,7 @@ public class ThirdPersonControl : MonoBehaviour {
 
 		// punching
 		if (punching) {
-			if (hitQuery < HitQueryMax) hitQuery++;
+			if (hitQuery < 3) hitQuery++;
 		}
 
 		// turn to closest enemy if not moving
@@ -221,8 +227,17 @@ public class ThirdPersonControl : MonoBehaviour {
 			inputPunch = false;
 		}
 
-		if(Input.GetKeyDown(KeyCode.X)) {
+		if(Input.GetKeyDown(KeyCode.X) && !activeRoll && activeLocomotion) {
 			inputRoll = true;
+			//activeRoll = true;
+			inputMove = false;
+			inputDir = Vector2.zero;
+			inputPunch = false;
+		}
+		if (activeRoll) {
+			inputMove = false;
+			inputDir = Vector2.zero;
+			inputPunch = false;
 		}
 		//Debug.Log(hitQuery);
 	}
@@ -346,6 +361,9 @@ public class ThirdPersonControl : MonoBehaviour {
 		if(inputRoll) {
 			animator.SetTrigger("Roll");
 		}
+		//else {
+		//	animator.ResetTrigger("Roll");
+		//}
 	}
 	
 	void UpdateLastPosition() {
