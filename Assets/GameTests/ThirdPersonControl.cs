@@ -73,6 +73,12 @@ public class ThirdPersonControl : MonoBehaviour {
 		}
 	}
 
+	void OnInvulnerable(int flag) {
+		if(unitHealth) {
+			unitHealth.Invulnerable = flag > 0;
+		}
+	}
+
 	public void OnAnimatorStateEnter(Animator animator, AnimatorStateInfo stateInfo, int layerIndex) {
 		if (animator != this.animator) return;
 

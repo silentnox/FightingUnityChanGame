@@ -196,7 +196,7 @@ public class EnemyControl : MonoBehaviour {
 		Transform head = animator.GetBoneTransform(HumanBodyBones.Head);
 
 		Vector3 diff = point - transform.position;
-		float heightDiff = diff.y;
+		float heightDiff = Mathf.Abs(diff.y);
 		diff.y = 0;
 		Vector2 dir = diff.normalized;
 		float angle = Mathf.Abs( Vector3.SignedAngle(dir, transform.forward,Vector3.up) );
@@ -330,14 +330,24 @@ public class EnemyControl : MonoBehaviour {
 						}
 
 						if (patrolTimer < 0 && !patrolMovingToNext) {
+							PatrolPoint nextPoint = null;
+
 							if (!patrolMovingBack) {
-								patrolPoint = patrolPoint.GetNextPatrolPoint();
+								nextPoint = patrolPoint.GetNextPatrolPoint();
+								if (!nextPoint) {
+									nextPoint = patrolPoint.GetPrevPatrolPoint();
+									patrolMovingBack = !patrolMovingBack;
+								}
 							}
 							else {
-								patrolPoint = patrolPoint.GetPrevPatrolPoint();
+								nextPoint = patrolPoint.GetPrevPatrolPoint();
+								if (!nextPoint) {
+									nextPoint = patrolPoint.GetNextPatrolPoint();
+									patrolMovingBack = !patrolMovingBack;
+								}
 							}
 
-							if (!patrolPoint) patrolMovingBack = !patrolMovingBack;
+							patrolPoint = nextPoint;
 
 							patrolMovingToNext = true;
 						}
@@ -443,12 +453,15 @@ public class EnemyControl : MonoBehaviour {
 		//float dist = navRemainDist;
 
 		//float signedAngle = Vector3.SignedAngle(transform.forward, dir, Vector3.up);
-		float signedAngle = Vector3.SignedAngle(transform.forward, navMoveDir2, Vector3.up);
+		float signedAngle = Vector3.SignedAngle(transform.forward.SetY(0), navMoveDir2, Vector3.up);
 
 		bool shouldTurn = Mathf.Abs(signedAngle) > 5;
-		bool shouldMove = navRemainDist > agent.radius && !shouldTurn;
+		bool reachedDest = navRemainDist < agent.radius;
+		//bool shouldMove = navRemainDist > agent.radius && !shouldTurn;
+		bool shouldMove = !reachedDest && !shouldTurn;
 
-		if (!shouldMove) {
+		//if (!shouldMove) {
+		if (reachedDest) {
 			//if (useTargetDir) {
 			if (targetDir != Vector3.zero) {
 				signedAngle = Vector3.SignedAngle(transform.forward, targetDir, Vector3.up);

@@ -3516,21 +3516,20 @@ MonoBehaviour:
   VisionAngle: 0
   AbsVisionRange: 0
   AlertTime: 8
-  ChaseTime: 4
   MinFiringRange: 0
   MaxFiringRange: 0
   AimMaxAngleH: 45
   AimMinAngleV: -180
   AimMaxAngleV: 180
   OptimalFiringRange: 0
-  AllyAlertRange: 0
-  ChainAlert: 0
   DropWeaponOnDeath: 1
   Weapon: {fileID: 2839256740769724219}
+  StartPatrolPoint: {fileID: 0}
+  shouldWalk: 0
   shouldRun: 0
   shouldFire: 0
   shouldAim: 0
-  lookTarget: {fileID: 0}
+  shouldWalkBack: 0
 --- !u!114 &6072820287836564628
 MonoBehaviour:
   m_ObjectHideFlags: 0
