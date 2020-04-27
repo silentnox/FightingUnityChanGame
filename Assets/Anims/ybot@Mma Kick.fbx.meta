@@ -58,33 +58,24 @@ ModelImporter:
       mirror: 0
       bodyMask: 01000000010000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000
       curves:
-      - name: DashFactor1
+      - name: DashFactor_
         curve:
           serializedVersion: 2
           curve:
           - serializedVersion: 3
             time: 0
             value: 0
-            inSlope: 0
-            outSlope: 0
-            tangentMode: 34
-            weightedMode: 0
-            inWeight: 0
-            outWeight: 0.33333334
-          - serializedVersion: 3
-            time: 0.1
-            value: 0
             inSlope: -0
-            outSlope: 5.015131
+            outSlope: 1.6666666
             tangentMode: 69
             weightedMode: 0
             inWeight: 0.33333334
             outWeight: 0.33333334
           - serializedVersion: 3
-            time: 0.29897523
-            value: 0.9978869
-            inSlope: 5.015131
-            outSlope: -4.8249817
+            time: 0.3
+            value: 0.5
+            inSlope: 1.6666666
+            outSlope: -2.4175658
             tangentMode: 69
             weightedMode: 0
             inWeight: 0.33333334
@@ -92,7 +83,7 @@ ModelImporter:
           - serializedVersion: 3
             time: 0.50475997
             value: 0.0049793124
-            inSlope: -4.8249817
+            inSlope: -2.4175658
             outSlope: -0.0100543415
             tangentMode: 69
             weightedMode: 0
@@ -109,6 +100,58 @@ ModelImporter:
             outWeight: 0
           preInfinity: 2
           postInfinity: 2
+          rotationOrder: 4
+      - name: PlaybackSpeed_
+        curve:
+          serializedVersion: 2
+          curve:
+          - serializedVersion: 3
+            time: 0
+            value: 1
+            inSlope: 0
+            outSlope: 0
+            tangentMode: 69
+            weightedMode: 0
+            inWeight: 0
+            outWeight: 0
+          - serializedVersion: 3
+            time: 0.3
+            value: 1
+            inSlope: -0
+            outSlope: -3.0107217
+            tangentMode: 69
+            weightedMode: 0
+            inWeight: 0.33333334
+            outWeight: 0.33333334
+          - serializedVersion: 3
+            time: 0.3996439
+            value: 0.7
+            inSlope: -3.0107217
+            outSlope: 1.4973339
+            tangentMode: 69
+            weightedMode: 0
+            inWeight: 0.33333334
+            outWeight: 0.33333334
+          - serializedVersion: 3
+            time: 0.6
+            value: 1
+            inSlope: 1.4973339
+            outSlope: 0
+            tangentMode: 69
+            weightedMode: 0
+            inWeight: 0.33333334
+            outWeight: 0.33333334
+          - serializedVersion: 3
+            time: 1
+            value: 1
+            inSlope: -0
+            outSlope: 0
+            tangentMode: 69
+            weightedMode: 0
+            inWeight: 0
+            outWeight: 0
+          preInfinity: 3
+          postInfinity: 3
           rotationOrder: 4
       events:
       - time: 0.36309522
