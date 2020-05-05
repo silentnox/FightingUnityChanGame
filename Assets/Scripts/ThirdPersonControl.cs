@@ -203,7 +203,7 @@ public class ThirdPersonControl : MonoBehaviour {
 			if (hitQuery < 3) hitQuery++;
 		}
 
-		Debug.Log(dir + " " + inputDir + " " + dir.magnitude + " " + inputDir.magnitude + " " + hitQuery);
+		//Debug.Log(dir + " " + inputDir + " " + dir.magnitude + " " + inputDir.magnitude + " " + hitQuery);
 
 		if (inputDir.magnitude > 0.5 && (hitQuery > 1 || (hitQuery > 0 && activePunching))) hitQuery = 0;
 

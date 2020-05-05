@@ -4332,13 +4332,15 @@ MonoBehaviour:
   AlertTime: 8
   MinFiringRange: 1
   MaxFiringRange: 8
+  OptimalFiringRange: 4
   AimMaxAngleH: 45
   AimMinAngleV: -180
   AimMaxAngleV: 180
-  OptimalFiringRange: 4
+  AllyAlertRange: 0
   DropWeaponOnDeath: 1
   Weapon: {fileID: 538067183742032044}
   StartPatrolPoint: {fileID: 0}
+  DoThink: 1
   shouldWalk: 0
   shouldRun: 0
   shouldFire: 0

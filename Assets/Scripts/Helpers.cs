@@ -62,5 +62,8 @@ public static class VectorHelpers {
 	public static Vector3 SetZ(this Vector3 vec, float z) {
 		return new Vector3(vec.x, vec.y, z);
 	}
+	public static Vector3 DirTo(this Vector3 vec, Vector3 target) {
+		return (target-vec).normalized;
+	}
 }
 

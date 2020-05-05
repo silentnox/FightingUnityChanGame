@@ -13,28 +13,23 @@ public class EnemyControl : MonoBehaviour {
 		Firing
 	}
 
-
-	//public float MoveFactor = 1;
-	//public float RunFactor = 1;
-	//public float TurnFactor = 1;
-
+	// public vars
 	public float VisionRange = 8;
 	public float VisionAngle = 60;
 	public float AbsVisionRange = 0;
 
 	public float AlertTime = 8;
-	//public float ChaseTime = 4;
+	public float ChaseTime = 4;
 
 	public float MinFiringRange = 1.5f;
 	public float MaxFiringRange = 8;
+	public float OptimalFiringRange = 5;
 
 	public float AimMaxAngleH = 90;
 	public float AimMinAngleV = -180;
 	public float AimMaxAngleV = 180;
 
-	public float OptimalFiringRange = 5;
-
-	//public float AllyAlertRange = 0;
+	public float AllyAlertRange = 5;
 	//public bool ChainAlert = false;
 
 	public bool DropWeaponOnDeath = true;
@@ -43,23 +38,33 @@ public class EnemyControl : MonoBehaviour {
 
 	public PatrolPoint StartPatrolPoint = null;
 
+	public bool DoThink = true;
+
+	// current state
 	State state = State.Idle;
 
 	UnitHealth targetEnemy = null;
+	UnitHealth lastSeenEnemy = null;
 	float distToEnemy = 0.0f;
+	float angleToEnemy = 0.0f;
 
 	float alertTimer = 0;
+	float chaseTimer = 0;
+
+	bool chaseMode = false;
 
 	Vector3 lastSeenEnemyPos;
 
+	float lastDamageAngle = 0;
+
 	Vector3 targetPos;
 	Vector3	targetDir;
-	//bool	useTargetDir = false;
 
 	Vector3 navNextPoint;
 	float	navRemainDist;
 	Vector3 navMoveDir,navMoveDir2;
 
+	// patroling related variables
 	PatrolPoint patrolPoint = null;
 	Vector3 patrolPos;
 	bool returnToPatrol = false;
@@ -82,7 +87,6 @@ public class EnemyControl : MonoBehaviour {
 	Animator animator;
 	UnitHealth unitHealth;
 
-	//public Transform lookTarget;
 	Vector3 lookTarget;
 
 	Smooth lookSmooth = new Smooth();
@@ -92,6 +96,12 @@ public class EnemyControl : MonoBehaviour {
 	bool moveIntoRange = false;
 
 	float rotateAngleDelta;
+	Vector3 rotateDir;
+
+	float turnFactor = 1.0f;
+
+	int robotId = 0;
+	static int numRobots = 0;
 
 	void OnDeath() {
 		if(Weapon && DropWeaponOnDeath) {
@@ -113,6 +123,8 @@ public class EnemyControl : MonoBehaviour {
 		UnitHealth attacker = other.GetOwner();
 		float angle = Mathf.Abs(Vector3.SignedAngle(transform.forward, (attacker.transform.position - transform.position).normalized, Vector3.up));
 
+		lastDamageAngle = angle;
+
 		if(angle < 90) {
 			transform.LookAt(attacker.transform, Vector3.up);
 		}
@@ -121,10 +133,11 @@ public class EnemyControl : MonoBehaviour {
 			animator.SetTrigger("Hit");
 		}
 		alertTimer = AlertTime;
+
+		AlertAlliesInRadius(AllyAlertRange);
 	}
 
 	void OnDamage(float amount) {
-
 	}
 
 	void OnGunFire() {
@@ -150,16 +163,18 @@ public class EnemyControl : MonoBehaviour {
 		return unitHealth && unitHealth.IsDead();
 	}
 
+	public float GetAlertTimer() {
+		return alertTimer;
+	}
+
 	public void SetDestination(Vector3 position) {
 		targetPos	= position;
 		targetDir	= Vector3.zero;
-		//useTargetDir = false;
 	}
 
 	public void SetDestination(Vector3 position, Vector3 dir) {
 		targetPos	= position;
 		targetDir	= dir;
-		//useTargetDir = true;
 	}
 
 	float GetAngleTo( Vector3 point ) {
@@ -167,6 +182,25 @@ public class EnemyControl : MonoBehaviour {
 		dir.y = 0;
 		dir = dir.normalized;
 		return Vector3.SignedAngle(transform.forward, dir, Vector3.up);
+	}
+
+	public void Alert( UnitHealth target = null ) {
+		alertTimer = AlertTime;
+		targetEnemy = target;
+	}
+
+	void AlertAlliesInRadius( float radius ) {
+		if (radius <= 0.0f) return;
+
+		Collider[] colliders = Physics.OverlapCapsule(transform.position, transform.position + new Vector3(0, 5, 0), radius);
+
+		foreach (Collider c in colliders) {
+			EnemyControl ally = c.GetComponent<EnemyControl>();
+			if (ally == null) continue;
+			if (c.gameObject == gameObject) continue;
+
+			ally.Alert( targetEnemy );
+		}
 	}
 
 	bool ScanTargets() {
@@ -193,6 +227,7 @@ public class EnemyControl : MonoBehaviour {
 		}
 
 		distToEnemy = minDist;
+		angleToEnemy = targetEnemy ? Mathf.Abs(Vector3.SignedAngle(transform.forward, (targetEnemy.transform.position - transform.position).normalized, Vector3.up)) : 0;
 
 		return targetEnemy != null;
 	}
@@ -205,7 +240,7 @@ public class EnemyControl : MonoBehaviour {
 		Vector3 diff = point - transform.position;
 		float heightDiff = Mathf.Abs(diff.y);
 		diff.y = 0;
-		Vector2 dir = diff.normalized;
+		Vector3 dir = diff.normalized;
 		float angle = Mathf.Abs( Vector3.SignedAngle(dir, transform.forward,Vector3.up) );
 		float dist = diff.magnitude;
 		float headDist = Vector3.Distance(head.position, point);
@@ -215,9 +250,7 @@ public class EnemyControl : MonoBehaviour {
 		Physics.Raycast(new Ray(head.position,diff.normalized), out hit, Mathf.Infinity, layerMask);
 
 		if(hit.distance < headDist) {
-			//if (targetEnemy != null && hit.collider.GetComponentInParent<UnitHealth>() != targetEnemy.GetComponent<UnitHealth>()) {
-				return false;
-			//}
+			return false;
 		}
 
 		if(heightDiff > 5) {
@@ -264,31 +297,39 @@ public class EnemyControl : MonoBehaviour {
 		patrolPos = transform.position;
 		patrolPoint = StartPatrolPoint;
 
-		//offset = animator.GetBoneTransform(HumanBodyBones.Spine);
-
 		animator.applyRootMotion = true;
 
 		unitHealth.OnDeath += OnDeath;
 		unitHealth.OnReceiveHit += OnReceiveHit;
+		unitHealth.OnDamage += OnDamage;
+
+		robotId = EnemyControl.numRobots;
+		EnemyControl.numRobots++;
     }
 
 	private void OnDestroy() {
 		unitHealth.OnDeath -= OnDeath;
 		unitHealth.OnReceiveHit -= OnReceiveHit;
+		unitHealth.OnDamage -= OnDamage;
 	}
 
 	void Think() {
+		if (!DoThink) return;
+
 		shouldAim = false;
 		shouldFire = false;
 		shouldRun = false;
 		shouldWalk = false;
 		shouldWalkBack = false;
-		//useTargetDir = false;
 
 		targetDir = Vector3.zero;
 		targetPos = transform.position;
 
 		ScanTargets();
+
+		if (targetEnemy) {
+			lastSeenEnemy = targetEnemy;
+		}
 
 		bool alertExpired = false;
 
@@ -302,21 +343,37 @@ public class EnemyControl : MonoBehaviour {
 		if (patrolTimer > 0) {
 			patrolTimer -= Time.deltaTime;
 		}
-
-		//if(!Weapon) {
-		//	return;
-		//}
+		if(chaseTimer > 0) {
+			chaseTimer -= Time.deltaTime;
+		}
 
 		if(alertTimer > 0) {
 			shouldRun = true;
 		}
 
+		if(chaseTimer < 0) {
+			chaseMode = false;
+		}
+
 		if (!targetEnemy) {
 
 			if (alertTimer > 0) {
+				shouldWalk = true;
+
 				targetPos = lastSeenEnemyPos;
+
+				if (Vector3.Distance(transform.position.SetY(0), lastSeenEnemyPos.SetY(0)) < 1 && !chaseMode) {
+					chaseMode = true;
+					chaseTimer = ChaseTime;
+				}
+
+				if (chaseMode) {
+					targetPos = lastSeenEnemy.transform.position;
+				}
 			}
 			else {
+				shouldWalk = true;
+
 				if (alertExpired) {
 					returnToPatrol = true;
 				}
@@ -328,7 +385,7 @@ public class EnemyControl : MonoBehaviour {
 					patrolPos = transform.position;
 
 					if (patrolPoint) {
-						if (Vector3.Distance(transform.position, patrolPoint.transform.position) < 0.5 && patrolMovingToNext) {
+						if (Vector3.Distance(transform.position, patrolPoint.transform.position) < 0.2 && patrolMovingToNext) {
 							patrolTimer = patrolPoint.WaitTime;
 							patrolMovingToNext = false;
 						}
@@ -374,12 +431,9 @@ public class EnemyControl : MonoBehaviour {
 				returnToPatrol = false;
 			}
 
-			//return;
 		}
 		else {
 			alertTimer = AlertTime;
-
-			//lookTarget = null;
 
 			Transform enemyTransform = targetEnemy.transform;
 
@@ -388,7 +442,14 @@ public class EnemyControl : MonoBehaviour {
 			}
 
 			if (distToEnemy < MinFiringRange) {
-				shouldWalkBack = true;
+				if (angleToEnemy < 20) {
+					//shouldWalk = true;
+					shouldWalkBack = true;
+				}
+				else {
+					targetDir = transform.position.DirTo(targetEnemy.transform.position);
+					turnFactor = 1.5f;
+				}
 			}
 			else {
 				if (distToEnemy > MaxFiringRange) {
@@ -400,99 +461,116 @@ public class EnemyControl : MonoBehaviour {
 						targetPos = targetEnemy.transform.position;
 					}
 					else {
-						//lookTarget = enemyTransform;
 						lookTarget = enemyTransform.position;
 						shouldAim = true;
 						shouldFire = true;
 						moveIntoRange = false;
+						targetPos = targetEnemy.transform.position;
 					}
 				}
+
+				if (moveIntoRange) shouldWalk = true;
 			}
 
 			lastSeenEnemyPos = targetEnemy.transform.position;
 		}
+
+		if (!shouldWalk) shouldRun = false;
+
+		//turnFactor = alertTimer > 0 ? 1.5f : 1.0f;
+
+		//if (Vector3.Distance(transform.position, targetPos) > 0.3) {
+		//	//shouldWalk = true;
+		//	targetDir = (targetPos - transform.position).SetY(0).normalized;
+		//}
+		//else {
+		//	targetDir = Vector3.zero;
+		//}
 	}
 
 	void UpdateNavigation() {
 		agent.nextPosition = transform.position;
 		agent.SetDestination(targetPos);
 
-		NavMeshPath path = new NavMeshPath();
-		bool valid = agent.CalculatePath(targetPos, path);
+		//NavMeshPath path = new NavMeshPath();
+		//bool valid = agent.CalculatePath(targetPos, path);
 
-		//Debug.Log(path.corners.Length);
+		////Debug.Log(path.corners.Length);
 
-		if (valid && path.corners.Length > 1) {
-			Vector3 next = path.corners[1];
+		//if (valid && path.corners.Length > 1) {
+		//	Vector3 next = path.corners[1];
 
-			float dist = (next - transform.position).magnitude;
+		//	float dist = (next - transform.position).magnitude;
 
-			if (dist < agent.radius) {
-				if (path.corners.Length > 2) {
-					next = path.corners[2];
-				}
-				else {
-					next = transform.position;
-				}
-			}
+		//	if (dist < agent.radius) {
+		//		if (path.corners.Length > 2) {
+		//			next = path.corners[2];
+		//		}
+		//		else {
+		//			next = transform.position;
+		//		}
+		//	}
 
-			navRemainDist = agent.remainingDistance;
-			navNextPoint = next;
-		}
-		else {
-			navRemainDist = 0;
-			navNextPoint = transform.position;
-		}
+		//	navRemainDist = agent.remainingDistance;
+		//	navNextPoint = next;
+		//}
+		//else {
+		//	navRemainDist = 0;
+		//	navNextPoint = transform.position;
+		//}
+
+		//Vector3 delta = (navNextPoint - transform.position);
+		//navMoveDir = delta.normalized;
+		//navMoveDir2 = delta.SetY(0).normalized;
+		//navMoveDir.y = 0;
+
+		NavMeshHit hit;
+		agent.SamplePathPosition(NavMesh.AllAreas, 0.5f, out hit);
+
+		navNextPoint = hit.position;
+		//navRemainDist = hit.distance;
+		navRemainDist = agent.remainingDistance;
 
 		Vector3 delta = (navNextPoint - transform.position);
 		navMoveDir = delta.normalized;
 		navMoveDir2 = delta.SetY(0).normalized;
-		//navMoveDir.y = 0;
+		navMoveDir.y = 0;
+
 	}
 
 	void UpdateMotion(float deltaTime) {
 
-		//if (!shouldWalk && !shouldWalkBack) return;
-
-		//Vector3 delta = (navNextPoint - transform.position);
-		//Vector3 dir = delta.normalized;
-		//dir.y = 0;
-		//float dist = navRemainDist;
-
 		float dashFactor = animator.GetFloat("DashFactor");
 		transform.Translate(new Vector3(0, 0, dashFactor * 0.5f), Space.Self);
 
-		//float signedAngle = Vector3.SignedAngle(transform.forward, dir, Vector3.up);
 		float signedAngle = Vector3.SignedAngle(transform.forward.SetY(0), navMoveDir2, Vector3.up);
+		float absAngle = Mathf.Abs(signedAngle);
 
 		bool shouldTurn = Mathf.Abs(signedAngle) > 5;
-		bool reachedDest = navRemainDist < agent.radius;
-		//bool shouldMove = navRemainDist > agent.radius && !shouldTurn;
-		bool shouldMove = !reachedDest && !shouldTurn;
+		//bool reachedDest = navRemainDist < agent.radius;
+		bool reachedDest = navRemainDist < 0.1;
+		bool shouldMove = !reachedDest && !shouldTurn && this.shouldWalk;
 
-		//if (!shouldMove) {
+		rotateDir = navMoveDir2;
+
 		if (reachedDest) {
-			//if (useTargetDir) {
 			if (targetDir != Vector3.zero) {
 				signedAngle = Vector3.SignedAngle(transform.forward, targetDir, Vector3.up);
 				shouldTurn = Mathf.Abs(signedAngle) > 5;
+				rotateDir = targetDir;
 			}
 		}
 
-		//if (Mathf.Abs(signedAngle) < 5) {
-		//	transform.Rotate(0, signedAngle, 0);
-		//}
-		if (Mathf.Abs(signedAngle) < 5) {
-			transform.Rotate(0, signedAngle, 0);
-		}
-
-		//transform.position.y = agent.nextPosition.y;
-
 		rotateAngleDelta = signedAngle;
 
-		//Debug.Log(shouldMove + " " + shouldTurn + " " + signedAngle + " " + dir + " " + GetTurn() + " " + Helpers.GetAngle360(dir));
+		if (Mathf.Abs(signedAngle) < 11) {
+			transform.Rotate(0, signedAngle, 0);
+			rotateAngleDelta = 0;
+			rotateDir = Vector3.zero;
+			shouldTurn = false;
+		}
 
-		//Debug.Log(delta + " " + dir + " " + dist);
+		//Debug.Log(Time.frameCount + " " + signedAngle + " " + targetDir);
 
 		int move = 0;
 
@@ -500,12 +578,14 @@ public class EnemyControl : MonoBehaviour {
 			move = shouldRun ? 2 : 1;
 		}
 
-		if(shouldWalkBack) {
+		if (shouldWalkBack) {
 			move = -1;
 		}
 
 		animator.SetInteger("Move", move);
 		animator.SetInteger("Direction", shouldTurn ? (int)Mathf.Sign(signedAngle) : 0);
+
+		animator.SetFloat("TurnFactor", turnFactor);
 
 		if (shouldTurn) {
 			state = State.Turning;
@@ -521,13 +601,6 @@ public class EnemyControl : MonoBehaviour {
 	}
 
 	void UpdateAim() {
-		//if (!lookTarget) return;
-		//if (!shouldAim) return;
-		//if (isMoving || isRotating) return;
-
-		//Vector3 dir = (lookTarget.position - transform.position).normalized;
-		//Vector3 dir = (lookTarget - transform.position).normalized;
-		//dir.y = 0;
 		Vector3 dir = (lookTarget - transform.position).SetY(0).normalized;
 		float signedAngle = Vector3.SignedAngle(transform.forward, dir, Vector3.up);
 
@@ -535,24 +608,11 @@ public class EnemyControl : MonoBehaviour {
 
 		if(shouldAim && (Mathf.Abs(signedAngle) > AimMaxAngleH || aimRotate)) {
 			targetDir = dir;
-			//useTargetDir = true;
 			animator.SetInteger("Firing", 0);
 			aimRotate = true;
 	
 			return;
 		}
-
-		//Debug.Log(signedAngle);
-		//useTargetDir = false;
-		//targetDir = Vector3.zero;
-
-		//int firing = shouldAim ? 1 : 0;
-
-		//bool animAiming = animator.GetCurrentAnimatorStateInfo(0).shortNameHash == Animator.StringToHash("Aiming") && animator.GetAnimatorTransitionInfo(0).duration < 0.001;
-
-		//if (animAiming && shouldFire && Weapon && Weapon.GetSalvoCounter() > 0 && lookSmooth.current > 0.98) {
-		//	firing = 2;
-		//}
 
 		int firing = 0;
 
@@ -591,10 +651,9 @@ public class EnemyControl : MonoBehaviour {
 			return;
 		}
 
-		lookSmooth.smoothTime = 0.3f;
+		lookSmooth.smoothTime = 0.2f;
 		lookSmooth.target = shouldAim && !aimRotate? 1f : 0f;
 
-		//if (!lookTarget) lookSmooth.target = 0f;
 		if (!shouldAim) lookSmooth.target = 0f;
 
 		lookSmooth.Eval(Time.deltaTime);
@@ -606,14 +665,6 @@ public class EnemyControl : MonoBehaviour {
 			tr.rotation = Quaternion.Slerp(q, tr.rotation, lookSmooth);
 			tr.rotation = tr.rotation * q * Quaternion.Inverse(transform.rotation);
 		}
-
-		//float angle = Vector3.SignedAngle(transform.forward.SetY(0), targetDir, Vector3.up);
-		//if (Mathf.Sign(rotateAngleDelta) != Mathf.Sign(angle) && state == State.Turning && targetDir != Vector3.zero) {
-		//	transform.Rotate(0, -angle, 0);
-		//}
-
-		//Debug.Log(rotateAngleDelta + " " + angle);
-		//GetComponent<Rigidbody>().isKinematic = false;
 	}
 
 	private void OnAnimatorMove() {
@@ -621,15 +672,7 @@ public class EnemyControl : MonoBehaviour {
 			return;
 		}
 
-		//float rot = rotateAngleDelta;
-		//float deltaRot = animator.deltaRotation.eulerAngles.y;
-		//if(Mathf.Abs(deltaRot) > Mathf.Abs(rot)) {
-		//	deltaRot = rot;
-		//}
-
 		Vector3 pos = animator.deltaPosition;
-		//Debug.Log(pos.magnitude);
-		//animator.ApplyBuiltinRootMotion();
 		transform.position += pos;
 		transform.rotation = animator.deltaRotation * transform.rotation;
 
@@ -641,15 +684,26 @@ public class EnemyControl : MonoBehaviour {
 		isMoving = animator.deltaPosition.magnitude > 0.01;
 		isRotating = animator.deltaRotation != new Quaternion(0,0,0,1);
 
-		//Debug.Log("M: R: " + isMoving + " " + isRotating);
-		//Debug.Log(animator.deltaRotation);
+		if (rotateDir != Vector3.zero) {
+			float signedAngle = Vector3.SignedAngle(transform.forward.SetY(0), rotateDir, Vector3.up);
+
+			if (Mathf.Sign(signedAngle) != Mathf.Sign(rotateAngleDelta)) {
+				transform.Rotate(0, signedAngle, 0);
+				animator.SetInteger("Direction", 0);
+			}
+			Debug.Log(signedAngle + " " + rotateAngleDelta);
+		}
 	}
 
-	private void OnDrawGizmos() {
+	void OnDrawGizmos() {
+//#if UNITY_EDITOR
 		Gizmos.color = Color.red;
 		Gizmos.DrawSphere(targetPos, 0.1f);
 		Gizmos.color = Color.green;
 		Gizmos.DrawSphere(navNextPoint, 0.1f);
 		Gizmos.DrawLine(transform.position, transform.position + targetDir * 1);
+		Gizmos.color = Color.blue;
+		Gizmos.DrawLine(transform.position, targetPos);
+//#endif
 	}
 }
