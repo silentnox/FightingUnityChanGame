@@ -125,7 +125,17 @@ public class ThirdPersonControl : MonoBehaviour {
 
 	void OnAttackHit( HitCollider self, HitCollider other ) {
 		if (activeHit) {
-			other.GetOwner().Damage(36);
+
+			UnitHealth owner = other.GetOwner();
+
+			float angle = Mathf.Abs(Vector3.SignedAngle(owner.transform.forward, (transform.position - owner.transform.position).normalized, Vector3.up));
+
+			if (angle > 90) {
+				owner.Damage(100);
+			}
+			else {
+				owner.Damage(36);
+			}
 
 			if(other.GetOwner().IsDead()) {
 				Transform chest = other.GetOwner().GetComponent<Animator>().GetBoneTransform(HumanBodyBones.Chest);

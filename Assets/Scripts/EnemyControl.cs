@@ -21,13 +21,15 @@ public class EnemyControl : MonoBehaviour {
 	public float AlertTime = 8;
 	public float ChaseTime = 4;
 
+	public float ReactionTime = 0;
+
 	public float MinFiringRange = 1.5f;
 	public float MaxFiringRange = 8;
 	public float OptimalFiringRange = 5;
 
 	public float AimMaxAngleH = 90;
-	public float AimMinAngleV = -180;
-	public float AimMaxAngleV = 180;
+	//public float AimMinAngleV = -180;
+	//public float AimMaxAngleV = 180;
 
 	public float AllyAlertRange = 5;
 	//public bool ChainAlert = false;
@@ -72,11 +74,11 @@ public class EnemyControl : MonoBehaviour {
 	bool patrolMovingToNext = false;
 	bool patrolMovingBack = false;
 
-	public bool shouldWalk = false;
-	public bool	shouldRun = false;
-	public bool	shouldFire = false;
-	public bool shouldAim = false;
-	public bool shouldWalkBack = false;
+	bool shouldWalk = false;
+	bool shouldRun = false;
+	bool shouldFire = false;
+	bool shouldAim = false;
+	bool shouldWalkBack = false;
 
 	Vector3 aimTarget;
 
@@ -86,6 +88,8 @@ public class EnemyControl : MonoBehaviour {
 	NavMeshAgent agent;
 	Animator animator;
 	UnitHealth unitHealth;
+	Collider collider;
+	CapsuleCollider capsule;
 
 	Vector3 lookTarget;
 
@@ -99,6 +103,8 @@ public class EnemyControl : MonoBehaviour {
 	Vector3 rotateDir;
 
 	float turnFactor = 1.0f;
+
+	Vector3 lastPosOnNavMesh;
 
 	int robotId = 0;
 	static int numRobots = 0;
@@ -150,6 +156,13 @@ public class EnemyControl : MonoBehaviour {
 	}
 
 	private void OnCollisionEnter(Collision collision) {
+		Rigidbody rb = GetComponent<Rigidbody>();
+		rb.velocity = Vector3.ProjectOnPlane(rb.velocity, collision.contacts[0].normal);
+		if (collision.rigidbody) {
+			collision.rigidbody.velocity = Vector3.ProjectOnPlane(collision.rigidbody.velocity, -collision.contacts[0].normal);
+		}
+		//rb.AddForce(-collision.impulse * collision.contactCount, ForceMode.Impulse);
+		Debug.Log(collision.impulse + " " + collision.relativeVelocity);
 		//GetComponent<Rigidbody>().isKinematic = false;
 		//if (collision.gameObject.GetComponent<UnitHealth>()) {
 		//	GetComponent<Rigidbody>().isKinematic = true;
@@ -204,7 +217,7 @@ public class EnemyControl : MonoBehaviour {
 	}
 
 	bool ScanTargets() {
-		Collider[] colliders = Physics.OverlapCapsule(transform.position, transform.position + new Vector3(0, 5, 0), VisionRange);
+		Collider[] colliders = Physics.OverlapCapsule(transform.position - new Vector3(0, 8, 0), transform.position + new Vector3(0, 8, 0), VisionRange);
 
 		float minDist = Mathf.Infinity;
 
@@ -216,9 +229,13 @@ public class EnemyControl : MonoBehaviour {
 			if (c.gameObject == gameObject) continue;
 			if (enemy.Type != UnitHealth.UnitType.Player) continue;
 
-			if (!IsVisible(c.transform.position)) continue;
+			Collider col = enemy.GetComponent<Collider>();
 
-			float dist = (c.transform.position - transform.position).magnitude;
+			Vector3 pos = col ? col.bounds.center : transform.position;
+
+			if (!IsVisible(pos)) continue;
+
+			float dist = (c.transform.position.SetY(0) - transform.position.SetY(0)).magnitude;
 
 			if (dist < minDist) {
 				minDist = dist;
@@ -235,25 +252,27 @@ public class EnemyControl : MonoBehaviour {
 	bool IsVisible(Vector3 point) {
 		//return true;
 
-		Transform head = animator.GetBoneTransform(HumanBodyBones.Head);
+		//Transform head = animator.GetBoneTransform(HumanBodyBones.Head);
+		//Vector3 headPos = head.position;
 
-		Vector3 diff = point - transform.position;
-		float heightDiff = Mathf.Abs(diff.y);
-		diff.y = 0;
+		Vector3 headPos = transform.position + new Vector3(0, capsule.height, 0);
+
+		Vector3 diff = point - headPos;
 		Vector3 dir = diff.normalized;
-		float angle = Mathf.Abs( Vector3.SignedAngle(dir, transform.forward,Vector3.up) );
-		float dist = diff.magnitude;
-		float headDist = Vector3.Distance(head.position, point);
+		float angle = Mathf.Abs( Vector3.SignedAngle(dir.SetY(0).normalized, transform.forward, Vector3.up) );
+		float dist = diff.SetY(0).magnitude;
+		float headDist = diff.magnitude;
 
 		RaycastHit hit;
-		int layerMask = ~(1 << LayerMask.NameToLayer("Units"));
-		Physics.Raycast(new Ray(head.position,diff.normalized), out hit, Mathf.Infinity, layerMask);
+		//int layerMask = ~(1 << LayerMask.NameToLayer("Units") | 1 << LayerMask.NameToLayer("Ragdoll"));
+		int layerMask = 1 << LayerMask.NameToLayer("Default");
+		Physics.Raycast(new Ray(headPos,dir), out hit, Mathf.Infinity, layerMask);
 
 		if(hit.distance < headDist) {
 			return false;
 		}
 
-		if(heightDiff > 5) {
+		if(Mathf.Abs(diff.y) > 5) {
 			return false;
 		}
 
@@ -283,19 +302,30 @@ public class EnemyControl : MonoBehaviour {
 	}
 
 	void Start() {
-		targetPos	= transform.position;
 		agent		= GetComponent<NavMeshAgent>();
 		animator	= GetComponent<Animator>();
 		unitHealth	= GetComponent<UnitHealth>();
-		agent.updatePosition	= false;
-		agent.updateRotation	= false;
-		agent.updateUpAxis		= true;
+		collider	= GetComponent<Collider>();
+		capsule		= GetComponent<CapsuleCollider>();
+
+		if(!agent) {
+			agent = gameObject.AddComponent<NavMeshAgent>();
+			agent.radius = 0.5f;
+		}
+
+		agent.updatePosition = false;
+		agent.updateRotation = false;
+		agent.updateUpAxis = true;
 
 		navNextPoint = transform.position;
 		navRemainDist = 0;
 
 		patrolPos = transform.position;
 		patrolPoint = StartPatrolPoint;
+
+		lastPosOnNavMesh = transform.position;
+
+		targetPos = transform.position;
 
 		animator.applyRootMotion = true;
 
@@ -433,6 +463,11 @@ public class EnemyControl : MonoBehaviour {
 
 		}
 		else {
+
+			if(alertTimer <= 0) {
+				AlertAlliesInRadius(AllyAlertRange);
+			}
+
 			alertTimer = AlertTime;
 
 			Transform enemyTransform = targetEnemy.transform;
@@ -442,14 +477,14 @@ public class EnemyControl : MonoBehaviour {
 			}
 
 			if (distToEnemy < MinFiringRange) {
-				if (angleToEnemy < 20) {
-					//shouldWalk = true;
-					shouldWalkBack = true;
-				}
-				else {
+				//if (angleToEnemy < 20) {
+				//	//shouldWalk = true;
+				//	shouldWalkBack = true;
+				//}
+				//else {
 					targetDir = transform.position.DirTo(targetEnemy.transform.position);
 					turnFactor = 1.5f;
-				}
+				//}
 			}
 			else {
 				if (distToEnemy > MaxFiringRange) {
@@ -525,17 +560,25 @@ public class EnemyControl : MonoBehaviour {
 		//navMoveDir.y = 0;
 
 		NavMeshHit hit;
-		agent.SamplePathPosition(NavMesh.AllAreas, 0.5f, out hit);
+		agent.SamplePathPosition(NavMesh.AllAreas, 0.3f, out hit);
 
 		navNextPoint = hit.position;
 		//navRemainDist = hit.distance;
 		navRemainDist = agent.remainingDistance;
+
+		if(Vector3.Distance(transform.position,targetPos) < 1e-3f) {
+			navNextPoint = transform.position;
+			navRemainDist = 0;
+		}
 
 		Vector3 delta = (navNextPoint - transform.position);
 		navMoveDir = delta.normalized;
 		navMoveDir2 = delta.SetY(0).normalized;
 		navMoveDir.y = 0;
 
+		//if(agent.isOnNavMesh) {
+		//	lastPosOnNavMesh = transform.position;
+		//}
 	}
 
 	void UpdateMotion(float deltaTime) {
@@ -563,11 +606,12 @@ public class EnemyControl : MonoBehaviour {
 
 		rotateAngleDelta = signedAngle;
 
-		if (Mathf.Abs(signedAngle) < 11) {
+		//if (Mathf.Abs(signedAngle) < 5) {
+		if (!shouldTurn && shouldMove) {
 			transform.Rotate(0, signedAngle, 0);
-			rotateAngleDelta = 0;
-			rotateDir = Vector3.zero;
-			shouldTurn = false;
+			//rotateAngleDelta = 0;
+			//rotateDir = Vector3.zero;
+			//shouldTurn = false;
 		}
 
 		//Debug.Log(Time.frameCount + " " + signedAngle + " " + targetDir);
@@ -607,6 +651,7 @@ public class EnemyControl : MonoBehaviour {
 		if (Mathf.Abs(signedAngle) < 8) aimRotate = false;
 
 		if(shouldAim && (Mathf.Abs(signedAngle) > AimMaxAngleH || aimRotate)) {
+			targetPos = transform.position;
 			targetDir = dir;
 			animator.SetInteger("Firing", 0);
 			aimRotate = true;
@@ -631,8 +676,8 @@ public class EnemyControl : MonoBehaviour {
 		}
 
 		Think();
-		UpdateNavigation();
 		UpdateAim();
+		UpdateNavigation();
 		UpdateMotion(Time.deltaTime);
 
 		//Debug.Log(targetDir);
@@ -665,6 +710,21 @@ public class EnemyControl : MonoBehaviour {
 			tr.rotation = Quaternion.Slerp(q, tr.rotation, lookSmooth);
 			tr.rotation = tr.rotation * q * Quaternion.Inverse(transform.rotation);
 		}
+
+		//agent.nextPosition = transform.position;
+		//if (!agent.isOnNavMesh) {
+		//	transform.position = lastPosOnNavMesh;
+		//}
+
+		NavMeshHit hit;
+		NavMesh.SamplePosition(transform.position, out hit, 2, NavMesh.AllAreas);
+
+		if(Vector3.Distance(transform.position,hit.position) < 0.001) {
+			lastPosOnNavMesh = transform.position;
+		}
+		else {
+			transform.position = hit.position;
+		}
 	}
 
 	private void OnAnimatorMove() {
@@ -672,9 +732,20 @@ public class EnemyControl : MonoBehaviour {
 			return;
 		}
 
+		int stateName = animator.GetCurrentAnimatorStateInfo(0).shortNameHash;
+		bool animTurn = stateName == Animator.StringToHash("LeftTurn") || stateName == Animator.StringToHash("RightTurn");
+		bool animMove = stateName == Animator.StringToHash("Walking") || stateName == Animator.StringToHash("Running") || stateName == Animator.StringToHash("WalkingBack");
+
 		Vector3 pos = animator.deltaPosition;
+
+		if(rotateDir != Vector3.zero) {
+			pos = Vector3.Project(pos, rotateDir);
+		}
+
 		transform.position += pos;
-		transform.rotation = animator.deltaRotation * transform.rotation;
+		if (!animator.IsInTransition(0)) {
+			transform.rotation = animator.deltaRotation * transform.rotation;
+		}
 
 		NavMeshHit hit;
 		agent.SamplePathPosition(NavMesh.AllAreas, 0, out hit);
@@ -691,7 +762,7 @@ public class EnemyControl : MonoBehaviour {
 				transform.Rotate(0, signedAngle, 0);
 				animator.SetInteger("Direction", 0);
 			}
-			Debug.Log(signedAngle + " " + rotateAngleDelta);
+			//Debug.Log(signedAngle + " " + rotateAngleDelta);
 		}
 	}
 
@@ -701,9 +772,11 @@ public class EnemyControl : MonoBehaviour {
 		Gizmos.DrawSphere(targetPos, 0.1f);
 		Gizmos.color = Color.green;
 		Gizmos.DrawSphere(navNextPoint, 0.1f);
-		Gizmos.DrawLine(transform.position, transform.position + targetDir * 1);
+		Gizmos.DrawLine(transform.position, transform.position + rotateDir * 1);
 		Gizmos.color = Color.blue;
 		Gizmos.DrawLine(transform.position, targetPos);
+		Gizmos.color = Color.yellow;
+		Gizmos.DrawSphere(lastPosOnNavMesh, 0.1f);
 //#endif
 	}
 }

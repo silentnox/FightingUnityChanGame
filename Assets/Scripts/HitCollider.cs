@@ -28,6 +28,7 @@ public class HitCollider : MonoBehaviour {
 
 	void OnHitContact( Collider other ) {
 		if (unitHealth == null) return;
+		if (!this.enabled) return;
 
 		HitCollider otherHitCollider = other.GetComponent<HitCollider>();
 
