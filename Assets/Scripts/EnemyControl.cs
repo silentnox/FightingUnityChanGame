@@ -106,6 +106,8 @@ public class EnemyControl : MonoBehaviour {
 
 	Vector3 lastPosOnNavMesh;
 
+	Quaternion torsoQuat;
+
 	int robotId = 0;
 	static int numRobots = 0;
 
@@ -147,7 +149,7 @@ public class EnemyControl : MonoBehaviour {
 	}
 
 	void OnGunFire() {
-		if (Weapon) {
+		if (Weapon && !animator.IsInTransition(0)) {
 			Weapon.HitTrigger();
 			if(Weapon.GetSalvoCounter() == 0) {
 				animator.SetInteger("Firing", 1);
@@ -699,16 +701,24 @@ public class EnemyControl : MonoBehaviour {
 		lookSmooth.smoothTime = 0.2f;
 		lookSmooth.target = shouldAim && !aimRotate? 1f : 0f;
 
-		if (!shouldAim) lookSmooth.target = 0f;
+		//if (!shouldAim) lookSmooth.target = 0f;
 
 		lookSmooth.Eval(Time.deltaTime);
 
+		//if (!isMoving && !isRotating) {
+		//	Transform tr = animator.GetBoneTransform(HumanBodyBones.Spine);
+		//	Quaternion q = tr.rotation;
+		//	tr.LookAt(lookTarget, Vector3.up);
+		//	tr.rotation = Quaternion.Slerp(q, tr.rotation, lookSmooth);
+		//	tr.rotation = tr.rotation * q * Quaternion.Inverse(transform.rotation);
+		//}
+
 		if (!isMoving && !isRotating) {
 			Transform tr = animator.GetBoneTransform(HumanBodyBones.Spine);
-			Quaternion q = tr.rotation;
-			tr.LookAt(lookTarget, Vector3.up);
-			tr.rotation = Quaternion.Slerp(q, tr.rotation, lookSmooth);
-			tr.rotation = tr.rotation * q * Quaternion.Inverse(transform.rotation);
+			Quaternion q = Quaternion.identity;
+			q.SetLookRotation(tr.position.DirTo(lookTarget), Vector3.up);
+			Quaternion q2 = Quaternion.Slerp(Quaternion.identity, q * Quaternion.Inverse(transform.rotation), lookSmooth);
+			tr.rotation = tr.rotation * q2/* * Quaternion.Inverse(transform.rotation)*/;
 		}
 
 		//agent.nextPosition = transform.position;
@@ -725,12 +735,20 @@ public class EnemyControl : MonoBehaviour {
 		else {
 			transform.position = hit.position;
 		}
+
+		NavMesh.FindClosestEdge(transform.position, out hit, NavMesh.AllAreas);
+
+		if (hit.distance < capsule.radius) {
+			transform.position -= (hit.position - transform.position) * (capsule.radius - hit.distance) / capsule.radius;
+		}
 	}
 
 	private void OnAnimatorMove() {
 		if (unitHealth && unitHealth.IsDead()) {
 			return;
 		}
+
+		torsoQuat = animator.GetBoneTransform(HumanBodyBones.Spine).rotation;
 
 		int stateName = animator.GetCurrentAnimatorStateInfo(0).shortNameHash;
 		bool animTurn = stateName == Animator.StringToHash("LeftTurn") || stateName == Animator.StringToHash("RightTurn");
@@ -742,7 +760,9 @@ public class EnemyControl : MonoBehaviour {
 			pos = Vector3.Project(pos, rotateDir);
 		}
 
-		transform.position += pos;
+		if (animMove) {
+			transform.position += pos;
+		}
 		if (!animator.IsInTransition(0)) {
 			transform.rotation = animator.deltaRotation * transform.rotation;
 		}
