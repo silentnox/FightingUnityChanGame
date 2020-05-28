@@ -48,6 +48,12 @@ class Helpers {
 		return new Vector2(inVec.x, inVec.z);
 	}
 
+	public static bool IsVisible( Vector3 from, Vector3 to, int layerMask ) {
+		RaycastHit hit;
+		Physics.Raycast(new Ray(from, from.DirTo(to)), out hit, Mathf.Infinity, layerMask);
+		return Vector3.Distance(from, to) < hit.distance;
+	}
+
 }
 
 public static class VectorHelpers {

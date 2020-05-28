@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
+using UnityEngine.Profiling;
 
 public class EnemyControl : MonoBehaviour {
 
@@ -52,6 +53,8 @@ public class EnemyControl : MonoBehaviour {
 
 	float alertTimer = 0;
 	float chaseTimer = 0;
+
+	float reactionTimer = 0;
 
 	bool chaseMode = false;
 
@@ -108,6 +111,8 @@ public class EnemyControl : MonoBehaviour {
 
 	Quaternion torsoQuat;
 
+	bool isVisibleToCamera = false;
+
 	int robotId = 0;
 	static int numRobots = 0;
 
@@ -157,6 +162,14 @@ public class EnemyControl : MonoBehaviour {
 		}
 	}
 
+	private void OnBecameVisible() {
+		isVisibleToCamera = true;
+	}
+
+	private void OnBecameInvisible() {
+		isVisibleToCamera = false;
+	}
+
 	private void OnCollisionEnter(Collision collision) {
 		Rigidbody rb = GetComponent<Rigidbody>();
 		rb.velocity = Vector3.ProjectOnPlane(rb.velocity, collision.contacts[0].normal);
@@ -193,18 +206,28 @@ public class EnemyControl : MonoBehaviour {
 	}
 
 	float GetAngleTo( Vector3 point ) {
-		Vector3 dir = (point - transform.position);
-		dir.y = 0;
-		dir = dir.normalized;
+		Vector3 dir = (point - transform.position).SetY(0).normalized;
 		return Vector3.SignedAngle(transform.forward, dir, Vector3.up);
+	}
+
+	bool IsNearPosition( Vector3 position ) {
+		Vector3 diff = position - transform.position;
+
+		if (Mathf.Abs(diff.y) > capsule.height * 1.2f) return false;
+
+		return diff.SetY(0).magnitude < capsule.radius * 0.5f;
 	}
 
 	public void Alert( UnitHealth target = null ) {
 		alertTimer = AlertTime;
-		targetEnemy = target;
+		if (target) {
+			targetEnemy = target;
+			lastSeenEnemy = target;
+			lastSeenEnemyPos = target.transform.position;
+		}
 	}
 
-	void AlertAlliesInRadius( float radius ) {
+	void AlertAlliesInRadius( float radius, bool onlyIfVisible = true ) {
 		if (radius <= 0.0f) return;
 
 		Collider[] colliders = Physics.OverlapCapsule(transform.position, transform.position + new Vector3(0, 5, 0), radius);
@@ -214,12 +237,18 @@ public class EnemyControl : MonoBehaviour {
 			if (ally == null) continue;
 			if (c.gameObject == gameObject) continue;
 
+			if(onlyIfVisible) {
+				if (!IsVisible(c.bounds.center)) continue;
+			}
+			
 			ally.Alert( targetEnemy );
 		}
 	}
 
 	bool ScanTargets() {
-		Collider[] colliders = Physics.OverlapCapsule(transform.position - new Vector3(0, 8, 0), transform.position + new Vector3(0, 8, 0), VisionRange);
+		Profiler.BeginSample("ScanTargets");
+		int layer = 1 << LayerMask.NameToLayer("Units");
+		Collider[] colliders = Physics.OverlapCapsule(transform.position - new Vector3(0, 8, 0), transform.position + new Vector3(0, 8, 0), VisionRange, layer);
 
 		float minDist = Mathf.Infinity;
 
@@ -247,6 +276,8 @@ public class EnemyControl : MonoBehaviour {
 
 		distToEnemy = minDist;
 		angleToEnemy = targetEnemy ? Mathf.Abs(Vector3.SignedAngle(transform.forward, (targetEnemy.transform.position - transform.position).normalized, Vector3.up)) : 0;
+
+		Profiler.EndSample();
 
 		return targetEnemy != null;
 	}
@@ -345,6 +376,10 @@ public class EnemyControl : MonoBehaviour {
 		unitHealth.OnDamage -= OnDamage;
 	}
 
+	void ThinkPatroling() {
+
+	}
+
 	void Think() {
 		if (!DoThink) return;
 
@@ -377,6 +412,9 @@ public class EnemyControl : MonoBehaviour {
 		}
 		if(chaseTimer > 0) {
 			chaseTimer -= Time.deltaTime;
+		}
+		if(reactionTimer > 0) {
+			reactionTimer -= Time.deltaTime;
 		}
 
 		if(alertTimer > 0) {
@@ -454,6 +492,8 @@ public class EnemyControl : MonoBehaviour {
 							if (patrolPoint.UseDirection) {
 								targetDir = patrolPoint.transform.forward;
 							}
+
+							if (patrolPoint.UseRunning) shouldRun = true;
 						}
 					}
 				}
@@ -474,19 +514,20 @@ public class EnemyControl : MonoBehaviour {
 
 			Transform enemyTransform = targetEnemy.transform;
 
-			if (enemyTransform.GetComponent<Animator>() && enemyTransform.GetComponent<Animator>().isHuman) {
-				enemyTransform = enemyTransform.GetComponent<Animator>().GetBoneTransform(HumanBodyBones.Chest);
+			Animator enemyAnimator = enemyTransform.GetComponent<Animator>();
+			if (enemyAnimator && enemyAnimator.isHuman) {
+				enemyTransform = enemyAnimator.GetBoneTransform(HumanBodyBones.Chest);
 			}
 
 			if (distToEnemy < MinFiringRange) {
-				//if (angleToEnemy < 20) {
-				//	//shouldWalk = true;
-				//	shouldWalkBack = true;
-				//}
-				//else {
+				if (angleToEnemy < 20) {
+					//shouldWalk = true;
+					shouldWalkBack = true;
+				}
+				else {
 					targetDir = transform.position.DirTo(targetEnemy.transform.position);
 					turnFactor = 1.5f;
-				//}
+				}
 			}
 			else {
 				if (distToEnemy > MaxFiringRange) {
@@ -514,15 +555,7 @@ public class EnemyControl : MonoBehaviour {
 
 		if (!shouldWalk) shouldRun = false;
 
-		//turnFactor = alertTimer > 0 ? 1.5f : 1.0f;
-
-		//if (Vector3.Distance(transform.position, targetPos) > 0.3) {
-		//	//shouldWalk = true;
-		//	targetDir = (targetPos - transform.position).SetY(0).normalized;
-		//}
-		//else {
-		//	targetDir = Vector3.zero;
-		//}
+		turnFactor = alertTimer > 0 ? 1.5f : 1.0f;
 	}
 
 	void UpdateNavigation() {
@@ -586,7 +619,7 @@ public class EnemyControl : MonoBehaviour {
 	void UpdateMotion(float deltaTime) {
 
 		float dashFactor = animator.GetFloat("DashFactor");
-		transform.Translate(new Vector3(0, 0, dashFactor * 0.5f), Space.Self);
+		transform.Translate(new Vector3(0, 0, dashFactor * deltaTime * 40f), Space.Self);
 
 		float signedAngle = Vector3.SignedAngle(transform.forward.SetY(0), navMoveDir2, Vector3.up);
 		float absAngle = Mathf.Abs(signedAngle);
@@ -715,10 +748,12 @@ public class EnemyControl : MonoBehaviour {
 
 		if (!isMoving && !isRotating) {
 			Transform tr = animator.GetBoneTransform(HumanBodyBones.Spine);
-			Quaternion q = Quaternion.identity;
-			q.SetLookRotation(tr.position.DirTo(lookTarget), Vector3.up);
-			Quaternion q2 = Quaternion.Slerp(Quaternion.identity, q * Quaternion.Inverse(transform.rotation), lookSmooth);
-			tr.rotation = tr.rotation * q2/* * Quaternion.Inverse(transform.rotation)*/;
+			//Quaternion q = Quaternion.LookRotation(tr.position.DirTo(lookTarget), Vector3.up);
+			Quaternion q = Quaternion.FromToRotation(transform.forward, tr.position.DirTo(lookTarget));
+			//q = q * Quaternion.Inverse(tr.rotation);
+			//Quaternion q2 = Quaternion.Slerp(Quaternion.identity, q * Quaternion.Inverse(transform.rotation), lookSmooth);
+			//tr.rotation = tr.rotation * q2/* * Quaternion.Inverse(transform.rotation)*/;
+			tr.rotation = Quaternion.Slerp(tr.rotation, q * tr.rotation/* * Quaternion.Inverse(transform.rotation)*/, lookSmooth);
 		}
 
 		//agent.nextPosition = transform.position;
@@ -727,20 +762,22 @@ public class EnemyControl : MonoBehaviour {
 		//}
 
 		NavMeshHit hit;
-		NavMesh.SamplePosition(transform.position, out hit, 2, NavMesh.AllAreas);
+		NavMesh.SamplePosition(transform.position, out hit, agent.radius, NavMesh.AllAreas);
 
 		if(Vector3.Distance(transform.position,hit.position) < 0.001) {
 			lastPosOnNavMesh = transform.position;
 		}
 		else {
-			transform.position = hit.position;
+			if (hit.hit) {
+				transform.position = hit.position;
+			}
 		}
 
-		NavMesh.FindClosestEdge(transform.position, out hit, NavMesh.AllAreas);
+		//NavMesh.FindClosestEdge(transform.position, out hit, NavMesh.AllAreas);
 
-		if (hit.distance < capsule.radius) {
-			transform.position -= (hit.position - transform.position) * (capsule.radius - hit.distance) / capsule.radius;
-		}
+		//if (hit.distance < capsule.radius) {
+		//	transform.position -= (hit.position - transform.position) * (capsule.radius - hit.distance) / capsule.radius;
+		//}
 	}
 
 	private void OnAnimatorMove() {
@@ -786,17 +823,24 @@ public class EnemyControl : MonoBehaviour {
 		}
 	}
 
-	void OnDrawGizmos() {
-//#if UNITY_EDITOR
-		Gizmos.color = Color.red;
-		Gizmos.DrawSphere(targetPos, 0.1f);
-		Gizmos.color = Color.green;
-		Gizmos.DrawSphere(navNextPoint, 0.1f);
-		Gizmos.DrawLine(transform.position, transform.position + rotateDir * 1);
-		Gizmos.color = Color.blue;
-		Gizmos.DrawLine(transform.position, targetPos);
-		Gizmos.color = Color.yellow;
-		Gizmos.DrawSphere(lastPosOnNavMesh, 0.1f);
-//#endif
+	void OnDrawGizmosSelected() {
+		//#if UNITY_EDITOR
+		if (Application.isPlaying) {
+			Gizmos.color = Color.red;
+			Gizmos.DrawSphere(targetPos, 0.1f);
+			Gizmos.color = Color.green;
+			Gizmos.DrawSphere(navNextPoint, 0.1f);
+			Gizmos.DrawLine(transform.position, transform.position + rotateDir * 1);
+			Gizmos.color = Color.blue;
+			Gizmos.DrawLine(transform.position, targetPos);
+			Gizmos.color = Color.yellow;
+			Gizmos.DrawSphere(lastPosOnNavMesh, 0.1f);
+			Transform tr = animator.GetBoneTransform(HumanBodyBones.Spine);
+			Quaternion q = Quaternion.identity;
+			q.SetLookRotation(tr.position.DirTo(lookTarget), Vector3.up);
+			Gizmos.color = Color.red;
+			Gizmos.DrawLine(tr.position, tr.position + q * Vector3.forward * 2);
+			//#endif
+		}
 	}
 }

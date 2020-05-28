@@ -2000,8 +2000,8 @@ MonoBehaviour:
   SalvoInterval: 1
   ClipSize: 0
   ClipReloadTime: 0
-  DamagePerBullet: 12
-  FlashStayTime: 0.1
+  DamagePerBullet: 20
+  FlashStayTime: 0.06
   FlashColor: {r: 1, g: 1, b: 1, a: 1}
 --- !u!65 &538067183742032047
 BoxCollider:
@@ -4326,26 +4326,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7f425bc213078fa448d96d38942d5049, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  VisionRange: 8
-  VisionAngle: 90
-  AbsVisionRange: 0
-  AlertTime: 8
+  VisionRange: 5
+  VisionAngle: 50
+  AbsVisionRange: 0.8
+  AlertTime: 10
+  ChaseTime: 3
+  ReactionTime: 0
   MinFiringRange: 1
   MaxFiringRange: 8
   OptimalFiringRange: 4
-  AimMaxAngleH: 45
-  AimMinAngleV: -180
-  AimMaxAngleV: 180
-  AllyAlertRange: 0
+  AimMaxAngleH: 60
+  AllyAlertRange: 12
   DropWeaponOnDeath: 1
   Weapon: {fileID: 538067183742032044}
   StartPatrolPoint: {fileID: 0}
   DoThink: 1
-  shouldWalk: 0
-  shouldRun: 0
-  shouldFire: 0
-  shouldAim: 0
-  shouldWalkBack: 0
 --- !u!114 &538067184873716733
 MonoBehaviour:
   m_ObjectHideFlags: 0

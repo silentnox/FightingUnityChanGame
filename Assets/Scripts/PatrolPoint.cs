@@ -2,9 +2,11 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+[ExecuteInEditMode]
 public class PatrolPoint : MonoBehaviour {
 
 	public bool UseDirection = false;
+	public bool UseRunning = false;
 	public PatrolPoint NextPatrolPoint = null;
 	public float WaitTime = 0;
 
@@ -28,7 +30,7 @@ public class PatrolPoint : MonoBehaviour {
 		PatrolPoint nextPoint = node ? node.GetComponent<PatrolPoint>() : null;
 		nextPatrolPoint = NextPatrolPoint ? NextPatrolPoint : nextPoint;
 
-		if (!nextPatrolPoint.enabled) nextPatrolPoint = null;
+		if (nextPatrolPoint && !nextPatrolPoint.enabled) nextPatrolPoint = null;
 
 		if(nextPatrolPoint) {
 			nextPatrolPoint.prevPatrolPoint = this;
@@ -41,6 +43,14 @@ public class PatrolPoint : MonoBehaviour {
     }
 
 	private void OnDrawGizmos() {
-		Gizmos.DrawLine(transform.position, transform.position + transform.forward * 1);
+		Gizmos.color = Color.green;
+		if (UseDirection) {
+			Gizmos.DrawLine(transform.position, transform.position + transform.forward * 1);
+		}
+		Gizmos.DrawSphere(transform.position, 0.15f);
+
+		if(nextPatrolPoint) {
+			Gizmos.DrawLine(transform.position, nextPatrolPoint.transform.position);
+		}
 	}
 }

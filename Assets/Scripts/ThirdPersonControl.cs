@@ -27,6 +27,7 @@ public class ThirdPersonControl : MonoBehaviour {
 
 	// cached component refs
 	Animator animator = null;
+	Collider collider = null;
 	UnitHealth unitHealth = null;
 
 	// animator parameers
@@ -157,15 +158,20 @@ public class ThirdPersonControl : MonoBehaviour {
 	}
 
 	bool FindClosestTarget() {
-		Collider[] colliders = Physics.OverlapCapsule(transform.position, transform.position + new Vector3(0, 3, 0), TargetSearchRadius );
+		int layer = 1 << LayerMask.NameToLayer("Units");
+		Collider[] colliders = Physics.OverlapCapsule(transform.position, transform.position + new Vector3(0, 3, 0), TargetSearchRadius, layer );
 
 		float minDist = Mathf.Infinity;
 
 		trackingTarget = null;
 
-		foreach(Collider c in colliders) {
+		Vector3 top = transform.position + new Vector3(0, collider.bounds.extents.y, 0 );
+		int visLayer = 1 << LayerMask.NameToLayer("Default");
+
+		foreach (Collider c in colliders) {
 			if (c.GetComponent<UnitHealth>() == null) continue;
 			if (c.gameObject == gameObject) continue;
+			if (!Helpers.IsVisible(top, c.bounds.center, visLayer)) continue;
 
 			float dist = (c.transform.position - transform.position).magnitude;
 
@@ -267,6 +273,7 @@ public class ThirdPersonControl : MonoBehaviour {
 	// Start is called before the first frame update
 	void Start() {
 		animator = GetComponent<Animator>();
+		collider = GetComponent<Collider>();
 		unitHealth = GetComponent<UnitHealth>();
 
 		anSmoothDir.current = 0;
@@ -398,7 +405,7 @@ public class ThirdPersonControl : MonoBehaviour {
 
 		float dashFactor = animator.GetFloat("DashFactor");
 		bool longDash = ((!trackingTarget || distToTarget < 1.3 || distToTarget > 3 || angleToTarget > 30));
-		transform.Translate(new Vector3(0, 0, dashFactor * (longDash? 0.1f : 0.4f) ), Space.Self);
+		transform.Translate(new Vector3(0, 0, dashFactor * (longDash? 10f : 40f) * deltaTime ), Space.Self);
 
 		if (trackingTarget && /*hitQuery > 0 &&*/ activePunching && distToTarget < 1.6 && distToTarget > 1 && angleToTarget < 30) {
 			//transform.LookAt(trackingTarget, Vector3.up);
