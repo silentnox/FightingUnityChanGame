@@ -619,7 +619,7 @@ public class EnemyControl : MonoBehaviour {
 	void UpdateMotion(float deltaTime) {
 
 		float dashFactor = animator.GetFloat("DashFactor");
-		transform.Translate(new Vector3(0, 0, dashFactor * deltaTime * 40f), Space.Self);
+		transform.Translate(new Vector3(0, 0, dashFactor * deltaTime * 30f), Space.Self);
 
 		float signedAngle = Vector3.SignedAngle(transform.forward.SetY(0), navMoveDir2, Vector3.up);
 		float absAngle = Mathf.Abs(signedAngle);
@@ -734,17 +734,7 @@ public class EnemyControl : MonoBehaviour {
 		lookSmooth.smoothTime = 0.2f;
 		lookSmooth.target = shouldAim && !aimRotate? 1f : 0f;
 
-		//if (!shouldAim) lookSmooth.target = 0f;
-
 		lookSmooth.Eval(Time.deltaTime);
-
-		//if (!isMoving && !isRotating) {
-		//	Transform tr = animator.GetBoneTransform(HumanBodyBones.Spine);
-		//	Quaternion q = tr.rotation;
-		//	tr.LookAt(lookTarget, Vector3.up);
-		//	tr.rotation = Quaternion.Slerp(q, tr.rotation, lookSmooth);
-		//	tr.rotation = tr.rotation * q * Quaternion.Inverse(transform.rotation);
-		//}
 
 		if (!isMoving && !isRotating) {
 			Transform tr = animator.GetBoneTransform(HumanBodyBones.Spine);
@@ -755,11 +745,6 @@ public class EnemyControl : MonoBehaviour {
 			//tr.rotation = tr.rotation * q2/* * Quaternion.Inverse(transform.rotation)*/;
 			tr.rotation = Quaternion.Slerp(tr.rotation, q * tr.rotation/* * Quaternion.Inverse(transform.rotation)*/, lookSmooth);
 		}
-
-		//agent.nextPosition = transform.position;
-		//if (!agent.isOnNavMesh) {
-		//	transform.position = lastPosOnNavMesh;
-		//}
 
 		NavMeshHit hit;
 		NavMesh.SamplePosition(transform.position, out hit, agent.radius, NavMesh.AllAreas);
@@ -815,7 +800,8 @@ public class EnemyControl : MonoBehaviour {
 		if (rotateDir != Vector3.zero) {
 			float signedAngle = Vector3.SignedAngle(transform.forward.SetY(0), rotateDir, Vector3.up);
 
-			if (Mathf.Sign(signedAngle) != Mathf.Sign(rotateAngleDelta)) {
+			if (Mathf.Sign(signedAngle) != Mathf.Sign(rotateAngleDelta) && Mathf.Abs(signedAngle) < 90) {
+				Debug.Log("Snapping");
 				transform.Rotate(0, signedAngle, 0);
 				animator.SetInteger("Direction", 0);
 			}

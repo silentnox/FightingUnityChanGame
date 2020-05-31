@@ -44,6 +44,8 @@ public class ThirdPersonControl : MonoBehaviour {
 	int hitCounter = 0;
 	//int HitQueryMax = 3;
 
+	bool attackIsHit = false;
+
 	// when processing attacking animation
 	bool activePunching = false;
 	bool activeHit = false;
@@ -97,6 +99,7 @@ public class ThirdPersonControl : MonoBehaviour {
 			if (hitCounter > 2) hitCounter = 0;
 			//activeHit = true;
 			activePunching = true;
+			attackIsHit = false;
 		}
 		if(stateInfo.shortNameHash == Animator.StringToHash("Locomotion")) {
 			activeLocomotion = true;
@@ -127,6 +130,11 @@ public class ThirdPersonControl : MonoBehaviour {
 	void OnAttackHit( HitCollider self, HitCollider other ) {
 		if (activeHit) {
 
+			if (attackIsHit) {
+				self.enabled = false;
+				return;
+			}
+
 			UnitHealth owner = other.GetOwner();
 
 			float angle = Mathf.Abs(Vector3.SignedAngle(owner.transform.forward, (transform.position - owner.transform.position).normalized, Vector3.up));
@@ -152,8 +160,11 @@ public class ThirdPersonControl : MonoBehaviour {
 				chest.GetComponent<Rigidbody>().AddForce(force,ForceMode.Impulse);
 			}
 
+			attackIsHit = true;
+
 			//self.enabled = false;
-			OnPunchActivate(0);
+			//OnPunchActivate(0);
+			//self.enabled = false;
 		}
 	}
 
