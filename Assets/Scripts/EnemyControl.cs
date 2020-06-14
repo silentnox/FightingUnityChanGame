@@ -19,6 +19,8 @@ public class EnemyControl : MonoBehaviour {
 	public float VisionAngle = 60;
 	public float AbsVisionRange = 0;
 
+	public float TurnVisionAngle = -1;
+
 	public float AlertTime = 8;
 	public float ChaseTime = 4;
 
@@ -246,7 +248,9 @@ public class EnemyControl : MonoBehaviour {
 	}
 
 	bool ScanTargets() {
+
 		Profiler.BeginSample("ScanTargets");
+
 		int layer = 1 << LayerMask.NameToLayer("Units");
 		Collider[] colliders = Physics.OverlapCapsule(transform.position - new Vector3(0, 8, 0), transform.position + new Vector3(0, 8, 0), VisionRange, layer);
 
@@ -295,6 +299,8 @@ public class EnemyControl : MonoBehaviour {
 		float angle = Mathf.Abs( Vector3.SignedAngle(dir.SetY(0).normalized, transform.forward, Vector3.up) );
 		float dist = diff.SetY(0).magnitude;
 		float headDist = diff.magnitude;
+
+		double visAngle = !isRotating ? VisionAngle : TurnVisionAngle;
 
 		RaycastHit hit;
 		//int layerMask = ~(1 << LayerMask.NameToLayer("Units") | 1 << LayerMask.NameToLayer("Ragdoll"));
@@ -355,6 +361,10 @@ public class EnemyControl : MonoBehaviour {
 
 		patrolPos = transform.position;
 		patrolPoint = StartPatrolPoint;
+
+		if(patrolPoint) {
+			patrolMovingToNext = true;
+		}
 
 		lastPosOnNavMesh = transform.position;
 
@@ -424,6 +434,23 @@ public class EnemyControl : MonoBehaviour {
 		if(chaseTimer < 0) {
 			chaseMode = false;
 		}
+
+		//if (targetEnemy) {
+		//	if (reactionTimer > 0) {
+		//		//if (!isRotating) {
+
+		//		//}
+		//		//else {
+		//		//	targetEnemy = null;
+		//		//}
+		//		targetEnemy = null;
+		//	}
+		//	else {
+		//		if (alertTimer < 0) {
+		//			reactionTimer = ReactionTime;
+		//		}
+		//	}
+		//}
 
 		if (!targetEnemy) {
 
@@ -708,6 +735,10 @@ public class EnemyControl : MonoBehaviour {
 	void Update() {
 		if(unitHealth && unitHealth.IsDead()) {
 			return;
+		}
+
+		if (TurnVisionAngle < 0) {
+			TurnVisionAngle = VisionAngle;
 		}
 
 		Think();

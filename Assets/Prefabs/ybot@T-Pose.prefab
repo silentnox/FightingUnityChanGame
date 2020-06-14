@@ -4327,8 +4327,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   VisionRange: 5
-  VisionAngle: 50
-  AbsVisionRange: 0.8
+  VisionAngle: 45
+  AbsVisionRange: 1
   AlertTime: 10
   ChaseTime: 3
   ReactionTime: 0
