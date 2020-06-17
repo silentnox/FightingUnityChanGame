@@ -135,9 +135,9 @@ public class UnitHealth : MonoBehaviour {
 	} 
 
 	void Update() {
-		if (Input.GetKeyDown(KeyCode.R)) {
-			ActivateRagdoll(!ragdollActive);
-		}
+		//if (Input.GetKeyDown(KeyCode.R)) {
+		//	ActivateRagdoll(!ragdollActive);
+		//}
 		if(regenDelay > 0) {
 			regenDelay -= Time.deltaTime;
 		}

@@ -20,6 +20,10 @@ public class EnemyControl : MonoBehaviour {
 	public float AbsVisionRange = 0;
 
 	public float TurnVisionAngle = -1;
+	public float TurnVisionRange = -1;
+
+	public float IdleVisionAngle = -1;
+	public float IdleVisionRange = -1;
 
 	public float AlertTime = 8;
 	public float ChaseTime = 4;
@@ -300,7 +304,17 @@ public class EnemyControl : MonoBehaviour {
 		float dist = diff.SetY(0).magnitude;
 		float headDist = diff.magnitude;
 
-		double visAngle = !isRotating ? VisionAngle : TurnVisionAngle;
+		double visAngle = VisionAngle;
+		double visRange = VisionRange;
+
+		if(isRotating) {
+			if (TurnVisionAngle >= 0) visAngle = TurnVisionAngle;
+			if (TurnVisionRange >= 0) visRange = TurnVisionRange;
+		}
+		else if (!isRotating && !isMoving) {
+			if (IdleVisionAngle >= 0) visAngle = IdleVisionAngle;
+			if (IdleVisionRange >= 0) visRange = IdleVisionRange;
+		}
 
 		RaycastHit hit;
 		//int layerMask = ~(1 << LayerMask.NameToLayer("Units") | 1 << LayerMask.NameToLayer("Ragdoll"));
@@ -320,12 +334,12 @@ public class EnemyControl : MonoBehaviour {
 		}
 
 		if (alertTimer > 0) {
-			if(dist > VisionRange) {
+			if(dist > visRange) {
 				return false;
 			}
 		}
 		else {
-			if(dist > VisionRange || angle > VisionAngle) {
+			if(dist > visRange || angle > visAngle) {
 				return false;
 			}
 		}
@@ -737,20 +751,11 @@ public class EnemyControl : MonoBehaviour {
 			return;
 		}
 
-		if (TurnVisionAngle < 0) {
-			TurnVisionAngle = VisionAngle;
-		}
 
 		Think();
 		UpdateAim();
 		UpdateNavigation();
 		UpdateMotion(Time.deltaTime);
-
-		//Debug.Log(targetDir);
-
-		//Debug.Log(alertTimer + " " + distToEnemy);
-
-		//Debug.Log(animator.GetAnimatorTransitionInfo(0).duration);
 	}
 
 	private void FixedUpdate() {
@@ -832,7 +837,7 @@ public class EnemyControl : MonoBehaviour {
 			float signedAngle = Vector3.SignedAngle(transform.forward.SetY(0), rotateDir, Vector3.up);
 
 			if (Mathf.Sign(signedAngle) != Mathf.Sign(rotateAngleDelta) && Mathf.Abs(signedAngle) < 90) {
-				Debug.Log("Snapping");
+				//Debug.Log("Snapping");
 				transform.Rotate(0, signedAngle, 0);
 				animator.SetInteger("Direction", 0);
 			}

@@ -2000,7 +2000,7 @@ MonoBehaviour:
   SalvoInterval: 1
   ClipSize: 0
   ClipReloadTime: 0
-  DamagePerBullet: 20
+  DamagePerBullet: 25
   FlashStayTime: 0.06
   FlashColor: {r: 1, g: 1, b: 1, a: 1}
 --- !u!65 &538067183742032047
@@ -4326,9 +4326,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7f425bc213078fa448d96d38942d5049, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  VisionRange: 5
-  VisionAngle: 45
-  AbsVisionRange: 1
+  VisionRange: 6
+  VisionAngle: 55
+  AbsVisionRange: 1.5
+  TurnVisionAngle: -1
+  TurnVisionRange: 1.8
+  IdleVisionAngle: -1
+  IdleVisionRange: -1
   AlertTime: 10
   ChaseTime: 3
   ReactionTime: 0
