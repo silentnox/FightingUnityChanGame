@@ -5,3 +5,4 @@ Robots use automatic rifles, but you can only attack in melee. be careful!
 
 Controls: Z - attack, X - roll, R - restart level
 
+Load Scenes/Level1.scene to play
