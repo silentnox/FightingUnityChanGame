@@ -4,6 +4,8 @@ using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.Profiling;
 
+
+// this is main script for controlling enemy behavior
 public class EnemyControl : MonoBehaviour {
 
 	public enum State {
@@ -35,11 +37,8 @@ public class EnemyControl : MonoBehaviour {
 	public float OptimalFiringRange = 5;
 
 	public float AimMaxAngleH = 90;
-	//public float AimMinAngleV = -180;
-	//public float AimMaxAngleV = 180;
 
 	public float AllyAlertRange = 5;
-	//public bool ChainAlert = false;
 
 	public bool DropWeaponOnDeath = true;
 
@@ -83,6 +82,7 @@ public class EnemyControl : MonoBehaviour {
 	bool patrolMovingToNext = false;
 	bool patrolMovingBack = false;
 
+	// flags which control animator and root motion state
 	bool shouldWalk = false;
 	bool shouldRun = false;
 	bool shouldFire = false;
@@ -122,13 +122,15 @@ public class EnemyControl : MonoBehaviour {
 	int robotId = 0;
 	static int numRobots = 0;
 
+	// on death, release weapon from hand if specified flag is set
+	// and also disable all hit colliders
 	void OnDeath() {
 		if(Weapon && DropWeaponOnDeath) {
 			Weapon.transform.parent = null;
-			//Weapon.GetComponent<Collider>().enabled = true;
-			Weapon.GetComponent<Rigidbody>().isKinematic = false;
-			Weapon.GetComponent<Rigidbody>().useGravity = true;
-			Weapon.GetComponent<Rigidbody>().detectCollisions = true;
+			Rigidbody rb = Weapon.GetComponent<Rigidbody>();
+			rb.isKinematic = false;
+			rb.useGravity = true;
+			rb.detectCollisions = true;
 		}
 
 		HitCollider[] colliders = GetComponentsInChildren<HitCollider>();
@@ -138,6 +140,8 @@ public class EnemyControl : MonoBehaviour {
 		}
 	}
 
+	// on receive  hit play damage animation
+	// and face towards enemy if attacked from the front
 	void OnReceiveHit(HitCollider self, HitCollider other) {
 		UnitHealth attacker = other.GetOwner();
 		float angle = Mathf.Abs(Vector3.SignedAngle(transform.forward, (attacker.transform.position - transform.position).normalized, Vector3.up));
@@ -177,20 +181,6 @@ public class EnemyControl : MonoBehaviour {
 	}
 
 	private void OnCollisionEnter(Collision collision) {
-		Rigidbody rb = GetComponent<Rigidbody>();
-		rb.velocity = Vector3.ProjectOnPlane(rb.velocity, collision.contacts[0].normal);
-		if (collision.rigidbody) {
-			collision.rigidbody.velocity = Vector3.ProjectOnPlane(collision.rigidbody.velocity, -collision.contacts[0].normal);
-		}
-		//rb.AddForce(-collision.impulse * collision.contactCount, ForceMode.Impulse);
-		Debug.Log(collision.impulse + " " + collision.relativeVelocity);
-		//GetComponent<Rigidbody>().isKinematic = false;
-		//if (collision.gameObject.GetComponent<UnitHealth>()) {
-		//	GetComponent<Rigidbody>().isKinematic = true;
-		//}
-		//foreach(ContactPoint cp in collision.contacts) {
-		//	//collision.
-		//}
 	}
 
 	public bool IsDead() {
@@ -251,6 +241,7 @@ public class EnemyControl : MonoBehaviour {
 		}
 	}
 
+	// scans nearby entites and selects closest one and tracking target
 	bool ScanTargets() {
 
 		Profiler.BeginSample("ScanTargets");
@@ -290,12 +281,9 @@ public class EnemyControl : MonoBehaviour {
 		return targetEnemy != null;
 	}
 
+	// detects point visibility
+	// taking into account view angles and raycasting
 	bool IsVisible(Vector3 point) {
-		//return true;
-
-		//Transform head = animator.GetBoneTransform(HumanBodyBones.Head);
-		//Vector3 headPos = head.position;
-
 		Vector3 headPos = transform.position + new Vector3(0, capsule.height, 0);
 
 		Vector3 diff = point - headPos;
@@ -400,10 +388,9 @@ public class EnemyControl : MonoBehaviour {
 		unitHealth.OnDamage -= OnDamage;
 	}
 
-	void ThinkPatroling() {
 
-	}
-
+	// this function implements enemy AI
+	// including: patroling points, target detection, target chasing, firing at target
 	void Think() {
 		if (!DoThink) return;
 
@@ -599,41 +586,10 @@ public class EnemyControl : MonoBehaviour {
 		turnFactor = alertTimer > 0 ? 1.5f : 1.0f;
 	}
 
+	// updates navigation towards designated point
 	void UpdateNavigation() {
 		agent.nextPosition = transform.position;
 		agent.SetDestination(targetPos);
-
-		//NavMeshPath path = new NavMeshPath();
-		//bool valid = agent.CalculatePath(targetPos, path);
-
-		////Debug.Log(path.corners.Length);
-
-		//if (valid && path.corners.Length > 1) {
-		//	Vector3 next = path.corners[1];
-
-		//	float dist = (next - transform.position).magnitude;
-
-		//	if (dist < agent.radius) {
-		//		if (path.corners.Length > 2) {
-		//			next = path.corners[2];
-		//		}
-		//		else {
-		//			next = transform.position;
-		//		}
-		//	}
-
-		//	navRemainDist = agent.remainingDistance;
-		//	navNextPoint = next;
-		//}
-		//else {
-		//	navRemainDist = 0;
-		//	navNextPoint = transform.position;
-		//}
-
-		//Vector3 delta = (navNextPoint - transform.position);
-		//navMoveDir = delta.normalized;
-		//navMoveDir2 = delta.SetY(0).normalized;
-		//navMoveDir.y = 0;
 
 		NavMeshHit hit;
 		agent.SamplePathPosition(NavMesh.AllAreas, 0.3f, out hit);
@@ -651,12 +607,11 @@ public class EnemyControl : MonoBehaviour {
 		navMoveDir = delta.normalized;
 		navMoveDir2 = delta.SetY(0).normalized;
 		navMoveDir.y = 0;
-
-		//if(agent.isOnNavMesh) {
-		//	lastPosOnNavMesh = transform.position;
-		//}
 	}
 
+
+	// applies motion parameters to animator
+	// using data provided by UpdateNavigation
 	void UpdateMotion(float deltaTime) {
 
 		float dashFactor = animator.GetFloat("DashFactor");
@@ -666,7 +621,6 @@ public class EnemyControl : MonoBehaviour {
 		float absAngle = Mathf.Abs(signedAngle);
 
 		bool shouldTurn = Mathf.Abs(signedAngle) > 5;
-		//bool reachedDest = navRemainDist < agent.radius;
 		bool reachedDest = navRemainDist < 0.1;
 		bool shouldMove = !reachedDest && !shouldTurn && this.shouldWalk;
 
@@ -682,15 +636,9 @@ public class EnemyControl : MonoBehaviour {
 
 		rotateAngleDelta = signedAngle;
 
-		//if (Mathf.Abs(signedAngle) < 5) {
 		if (!shouldTurn && shouldMove) {
 			transform.Rotate(0, signedAngle, 0);
-			//rotateAngleDelta = 0;
-			//rotateDir = Vector3.zero;
-			//shouldTurn = false;
 		}
-
-		//Debug.Log(Time.frameCount + " " + signedAngle + " " + targetDir);
 
 		int move = 0;
 
@@ -720,6 +668,7 @@ public class EnemyControl : MonoBehaviour {
 		}
 	}
 
+	// in conjunction with LateUpdate code handles  target tracking and aiming
 	void UpdateAim() {
 		Vector3 dir = (lookTarget - transform.position).SetY(0).normalized;
 		float signedAngle = Vector3.SignedAngle(transform.forward, dir, Vector3.up);
@@ -762,6 +711,9 @@ public class EnemyControl : MonoBehaviour {
 		//UpdateMotion(Time.fixedDeltaTime);
 	}
 
+	// has two purposes
+	// first: setups entity Spine bone towards tracking target (if set)
+	// second: samples current NavMesh position to be used in OnAnimatorMove  function
 	private void LateUpdate() {
 		if (unitHealth && unitHealth.IsDead()) {
 			return;
@@ -774,12 +726,8 @@ public class EnemyControl : MonoBehaviour {
 
 		if (!isMoving && !isRotating) {
 			Transform tr = animator.GetBoneTransform(HumanBodyBones.Spine);
-			//Quaternion q = Quaternion.LookRotation(tr.position.DirTo(lookTarget), Vector3.up);
 			Quaternion q = Quaternion.FromToRotation(transform.forward, tr.position.DirTo(lookTarget));
-			//q = q * Quaternion.Inverse(tr.rotation);
-			//Quaternion q2 = Quaternion.Slerp(Quaternion.identity, q * Quaternion.Inverse(transform.rotation), lookSmooth);
-			//tr.rotation = tr.rotation * q2/* * Quaternion.Inverse(transform.rotation)*/;
-			tr.rotation = Quaternion.Slerp(tr.rotation, q * tr.rotation/* * Quaternion.Inverse(transform.rotation)*/, lookSmooth);
+			tr.rotation = Quaternion.Slerp(tr.rotation, q * tr.rotation, lookSmooth);
 		}
 
 		NavMeshHit hit;
@@ -801,6 +749,9 @@ public class EnemyControl : MonoBehaviour {
 		//}
 	}
 
+
+	// handles entity root motion
+	// and also projects entity position on NavMesh
 	private void OnAnimatorMove() {
 		if (unitHealth && unitHealth.IsDead()) {
 			return;

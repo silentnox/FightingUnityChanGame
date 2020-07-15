@@ -8,7 +8,7 @@ public enum GunType {
 	Rifle
 }
 
-
+// implements gun with ability to shoot projectiles or rays when trigger is hit
 public class GunHelper : MonoBehaviour {
 	public Transform Grip1 = null;
 	public Transform Grip2 = null;

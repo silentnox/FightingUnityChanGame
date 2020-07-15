@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+// this script implements follow-up camera on main character
 public class FollowCamera : MonoBehaviour {
 
 	public GameObject FollowTarget = null;
@@ -10,6 +11,8 @@ public class FollowCamera : MonoBehaviour {
 
 	public float AttackAngle = 45;
 	public float Distance = 10;
+	// amount of inertia camera has when moving towards tracking target
+	// the higher value is, the more sluggish camera motion feels
 	public float Inertia = 1;
 
 	private Vector3 Pos;

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+// basic patroling point to be used by EnemyControl script
 [ExecuteInEditMode]
 public class PatrolPoint : MonoBehaviour {
 
@@ -14,9 +15,6 @@ public class PatrolPoint : MonoBehaviour {
 	PatrolPoint prevPatrolPoint = null;
 
 	public PatrolPoint GetNextPatrolPoint() {
-		//Transform node = transform.parent.GetChild(transform.GetSiblingIndex() + 1);
-		//PatrolPoint nextPoint = node?node.GetComponent<PatrolPoint>():null;
-		//return NextPatrolPoint?NextPatrolPoint:nextPoint;
 		return nextPatrolPoint;
 	}
 

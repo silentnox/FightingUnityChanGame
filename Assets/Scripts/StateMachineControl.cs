@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using System;
 
+// this script monitors Animator state machine
+// and emits events when state changes
 public class StateMachineControl : StateMachineBehaviour {
 
 	public static event Action<Animator, AnimatorStateInfo, int> onStateEnter;

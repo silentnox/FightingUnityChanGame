@@ -15,7 +15,7 @@ GameObject:
   - component: {fileID: 7929951936695350099}
   - component: {fileID: 7929951936695350092}
   m_Layer: 2
-  m_Name: PTK_Door_Medium
+  m_Name: SlideDoor1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -29,7 +29,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 7928652096413904413}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 16.581135, y: 3.119999, z: -6.0678}
+  m_LocalPosition: {x: 16.581135, y: 3.15, z: -6.0678}
   m_LocalScale: {x: 1, y: 1, z: 1.277}
   m_Children:
   - {fileID: 7934649112408555543}
@@ -182,7 +182,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 639bdae38663ce249835e384c15d06d3, type: 2}
+  - {fileID: 2100000, guid: ef5d4d06c4c9cce47aa5615f234fcfc1, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0

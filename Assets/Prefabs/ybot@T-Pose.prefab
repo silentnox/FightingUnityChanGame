@@ -4327,10 +4327,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   VisionRange: 6
-  VisionAngle: 55
-  AbsVisionRange: 1.5
+  VisionAngle: 40
+  AbsVisionRange: 1
   TurnVisionAngle: -1
-  TurnVisionRange: 1.8
+  TurnVisionRange: 1.5
   IdleVisionAngle: -1
   IdleVisionRange: -1
   AlertTime: 10

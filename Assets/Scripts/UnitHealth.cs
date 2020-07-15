@@ -4,6 +4,7 @@ using System;
 using UnityEngine;
 using UnityEngine.Events;
 
+// implements basic component for tracking unit health points & ragdoll spawning
 public class UnitHealth : MonoBehaviour {
 
 	public enum UnitType {
@@ -39,8 +40,6 @@ public class UnitHealth : MonoBehaviour {
 
 	Vector3 lastDamageDir = Vector3.zero;
 	Vector3 lastDamagePos = Vector3.zero;
-
-
 
 	public bool IsRagdoll() {
 		return ragdollActive;
@@ -83,7 +82,7 @@ public class UnitHealth : MonoBehaviour {
 			AfterRagdoll?.Invoke();
 		}
 
-		Debug.Log("Ragdoll: " + ragdollActive);
+		//Debug.Log("Ragdoll: " + ragdollActive);
 	}
 
 	public void Damage( float amount, GameObject attacker =null, Vector3? from = null ) {
@@ -109,11 +108,9 @@ public class UnitHealth : MonoBehaviour {
 	public void OnHitColliderContact( HitCollider self, HitCollider other ) {
 		if(self.ColliderType != other.ColliderType) {
 			if(self.ColliderType == global::HitCollider.Type.Inflict ) {
-				//OnInflictHit(self,other);
 				OnInflictHit?.Invoke(self, other);
 			}
 			else if (self.ColliderType == global::HitCollider.Type.Receive) {
-				//OnReceiveHit(self,other);
 				OnReceiveHit?.Invoke(self, other);
 			}
 		}
@@ -135,9 +132,6 @@ public class UnitHealth : MonoBehaviour {
 	} 
 
 	void Update() {
-		//if (Input.GetKeyDown(KeyCode.R)) {
-		//	ActivateRagdoll(!ragdollActive);
-		//}
 		if(regenDelay > 0) {
 			regenDelay -= Time.deltaTime;
 		}

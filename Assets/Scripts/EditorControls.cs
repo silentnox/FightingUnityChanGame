@@ -4,9 +4,6 @@ using UnityEngine;
 
 public class EditorControls : MonoBehaviour
 {
-	// Toggles the time scale between 1 and 0.7
-	// whenever the user hits the Fire1 button.
-
 	private float fixedDeltaTime;
 
 	void Awake() {

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+// this is main script for controlling Unity-chan behavior - movement and attacking
 public class ThirdPersonControl : MonoBehaviour {
 
 	//				Public Parameters
@@ -35,6 +36,7 @@ public class ThirdPersonControl : MonoBehaviour {
 
 	AnimatorStateInfo? currentState = null;
 
+	// current(closest) target UnityChan is going to face
 	Transform trackingTarget = null;
 	float distToTarget = Mathf.Infinity;
 	float angleToTarget = 0;
@@ -54,6 +56,7 @@ public class ThirdPersonControl : MonoBehaviour {
 	// when processing locomotion animation
 	bool activeLocomotion = false;
 
+	// entities this mb touches this frame
 	List<Collision> touches = new List<Collision>();
 	float distToGround = 0.0f;
 	bool isAir = false;
@@ -66,6 +69,7 @@ public class ThirdPersonControl : MonoBehaviour {
 		return unitHealth && unitHealth.IsDead();
 	}
 
+	// called from animation event when attacking
 	void OnPunchActivate(int flag) {
 		activeHit = flag > 0;
 		Debug.Log("Punch " + flag);
@@ -77,6 +81,7 @@ public class ThirdPersonControl : MonoBehaviour {
 		}
 	}
 
+	// called from animation events when rolling 
 	void OnInvulnerable(int flag) {
 		if(unitHealth) {
 			unitHealth.Invulnerable = flag > 0;
@@ -88,16 +93,13 @@ public class ThirdPersonControl : MonoBehaviour {
 
 		currentState = stateInfo;
 
-		//if(stateInfo.shortNameHash == Animator.StringToHash("Punching")) {
 		if (stateInfo.IsTag("Punching")) {
 			Debug.Log("Animator:" + hitQuery);
 			if (hitQuery > 0) {
 				hitQuery--;
 				hitCounter++;
 			}
-			//if (hitQuery <= 0) hitCounter = 0;
 			if (hitCounter > 2) hitCounter = 0;
-			//activeHit = true;
 			activePunching = true;
 			attackIsHit = false;
 		}
@@ -114,7 +116,6 @@ public class ThirdPersonControl : MonoBehaviour {
 
 		currentState = null;
 
-		//if (stateInfo.shortNameHash == Animator.StringToHash("Punching")) {
 		if (stateInfo.IsTag("Punching")) {
 			activeHit = false;
 			activePunching = false;
@@ -139,6 +140,7 @@ public class ThirdPersonControl : MonoBehaviour {
 
 			float angle = Mathf.Abs(Vector3.SignedAngle(owner.transform.forward, (transform.position - owner.transform.position).normalized, Vector3.up));
 
+			// attacks from the back deal triple the damage
 			if (angle > 90) {
 				owner.Damage(100);
 			}
@@ -151,23 +153,17 @@ public class ThirdPersonControl : MonoBehaviour {
 				Vector3 force = ( chest.position-transform.position );
 				force.y = 0;
 				force = force.normalized;
-				//force.y += 1.3f;
 				force.y += 0.8f;
 				force = force.normalized;
-				//force *= 12000;
-				//chest.GetComponent<Rigidbody>().AddForce(force);
 				force *= 200;
 				chest.GetComponent<Rigidbody>().AddForce(force,ForceMode.Impulse);
 			}
 
 			attackIsHit = true;
-
-			//self.enabled = false;
-			//OnPunchActivate(0);
-			//self.enabled = false;
 		}
 	}
 
+	// detect closest enemy not obstructed by wall
 	bool FindClosestTarget() {
 		int layer = 1 << LayerMask.NameToLayer("Units");
 		Collider[] colliders = Physics.OverlapCapsule(transform.position, transform.position + new Vector3(0, 3, 0), TargetSearchRadius, layer );
@@ -198,6 +194,7 @@ public class ThirdPersonControl : MonoBehaviour {
 		return trackingTarget != null;
 	}
 
+	// convert player input to motion and attacking commands
 	void UpdateInput() {
 
 		Vector2 dir = new Vector2(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical"));
@@ -368,6 +365,7 @@ public class ThirdPersonControl : MonoBehaviour {
 		//Debug.Log(isAir + " " + touches.Count);
 	}
 
+	// updates Animator parameters
 	void UpdateAnimatorParameters() {
 
 		if (isAir) return;
@@ -410,6 +408,9 @@ public class ThirdPersonControl : MonoBehaviour {
 
 	}
 
+
+	// unlike EnemyControl, TPC doesn't utilize root motion
+	// so all movement is done via manual Transform control
 	void ApplyMotion( float deltaTime ) {
 
 		if (isAir) return;
@@ -464,8 +465,6 @@ public class ThirdPersonControl : MonoBehaviour {
 
 		CheckAir();
 
-		//Debug.Log("HQ:" + hitQuery);
-
 		UpdateInput();
 		UpdateAnimatorParameters();
 	}
@@ -479,8 +478,6 @@ public class ThirdPersonControl : MonoBehaviour {
 	}
 
 	private void OnAnimatorMove() {
-		//transform.rotation = animator.deltaRotation * transform.rotation;
-		//transform.position += animator.deltaPosition;
 		animator.ApplyBuiltinRootMotion();
 	}
 }

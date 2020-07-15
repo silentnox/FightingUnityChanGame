@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+// simple slide door script
+// detect when entity enters collision box and then play open animation
 public class SlideDoor : MonoBehaviour {
 
 	public bool Open = false;
@@ -30,12 +32,10 @@ public class SlideDoor : MonoBehaviour {
 
 	// Update is called once per frame
 	void Update() {
-		//if (changedState) {
-			foreach (Animator anim in animators) {
-				anim.speed = Speed;
-				anim.Play(numColliders > 0 || Open? "Open" : "Close");
-			}
-			changedState = false;
-		//}
+		foreach (Animator anim in animators) {
+			anim.speed = Speed;
+			anim.Play(numColliders > 0 || Open? "Open" : "Close");
+		}
+		changedState = false;
     }
 }

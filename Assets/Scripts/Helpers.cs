@@ -9,21 +9,12 @@ class Smooth {
 	public float currentVelocity = 0;
 	public float maxSpeed = Mathf.Infinity;
 
-	//public static float deltaTime = 0;
-
-	//public Smooth(float input) {
-	//	this.target = input;
-	//	this.current = input;
-	//}
 	public void Eval(float deltaTime) {
 		current = Mathf.SmoothDamp(current, target, ref currentVelocity, smoothTime, maxSpeed, deltaTime);
 	}
 	public static implicit operator float(Smooth smooth) {
 		return smooth.current;
 	}
-	//public static implicit operator Smooth(float input) {
-	//	return new Smooth(input);
-	//}
 }
 
 class Helpers {

@@ -58,7 +58,7 @@ public class GameManager : MonoBehaviour {
 		if(levelPassed) {
 			Time.timeScale = 0;
 			unityChan.Invulnerable = true;
-			text1.text = "Victory";
+			text1.text = "Level completed!";
 		}
     }
 }

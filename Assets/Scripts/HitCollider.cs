@@ -39,15 +39,6 @@ public class HitCollider : MonoBehaviour {
 	}
 
 	private void OnTriggerEnter(Collider other) {
-		//if (unitHealth == null) return;
-
-		//HitCollider otherHitCollider = other.GetComponent<HitCollider>();
-
-		//if (otherHitCollider == null) return;
-		//if (unitHealth == otherHitCollider.unitHealth) return;
-
-		//unitHealth.OnHitColliderContact(this, otherHitCollider);
-
 		if (!contacts.Contains(other)) {
 			contacts.Add(other);
 			OnHitContact(other);
